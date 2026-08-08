@@ -13,6 +13,14 @@
 <meta name="apple-mobile-web-app-title" content="ICU 化验台">
 <link rel="apple-touch-icon" href="icon.svg">
 
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#1a6b8a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="ICU 化验台">
+<link rel="apple-touch-icon" href="icon.svg">
+
 <style>
 :root{--blue:#1a6b8a;--blue2:#12546d;--bg:#f0f4f7;--card:#fff;--line:#dce5ec;--text:#22313a;--muted:#687984;--red:#bc3028;--green:#18794e;--amber:#b7791f}
 *{box-sizing:border-box}
@@ -372,6 +380,7 @@ textarea{resize:vertical;min-height:150px;line-height:1.5}
 /* 自定义模块 / 评分入口 */
 .calc-box{background:#f3f9fc;border:1px dashed var(--line);border-radius:8px;padding:10px;margin:8px 0;font-size:13px}
 .score-tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.score-pttag{margin:0 16px 10px;padding:8px 12px;background:#eaf3f7;border:1px solid var(--line);border-radius:8px;font-size:13px;color:var(--blue2)}
 .score-tab{border:1px solid var(--line);background:#fff;border-radius:20px;padding:6px 14px;font-size:13px;font-weight:700;color:var(--muted)}
 .score-tab.on{background:var(--blue);color:#fff;border-color:var(--blue)}
 .score-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
@@ -827,6 +836,7 @@ textarea{resize:vertical;min-height:150px;line-height:1.5}
 <div class="view-page" id="scoreModal">
   <div class="modal">
     <div class="modal-head"><h2 id="scoreTitle">评分系统</h2><button class="close" data-close="scoreModal">← 返回</button></div>
+    <div id="scorePtTag" class="score-pttag"></div>
     <div class="modal-body">
       <div class="score-tabs">
         <button class="score-tab on" data-score="crcl">内生肌酐清除率</button>
@@ -992,9 +1002,10 @@ const fmtNum=v=>{const x=parseFloat(v);if(!isFinite(x))return v;if(Math.abs(x)>=
 const n=v=>{const x=parseFloat(v);return isFinite(x)?x:null};
 function toast(s){const t=$('#notice');t.textContent=s;t.style.opacity='1';clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.opacity='0',1800);}
 /* 版本与更新提示 */
-const APP_VERSION='2026.08.08-r3';
+const APP_VERSION='2026.08.08-r4';
 const READ_VERSION_KEY='wb_lab_read_version_v1';
 const UPDATE_LOG=[
+  {v:'2026.08.08-r4',date:'2026-08-08',title:'评分系统按患者联动',items:['评分手动补填值按患者分别保存（切人不丢）','评分页顶部显示当前患者、切换后自动刷新','APACHE II 自动提取体温/血压/心率/呼吸','血气分析草稿与结果按患者独立保留','化验更新后评分自动按最新值重算']},
   {v:'2026.08.08-r3',date:'2026-08-08',title:'查房台整体重构',items:['新增「药物使用记录」「出入量」独立页面','底部导航可拖拽排序、标签可自定义','「我的」改为二级菜单、患者切换并入简介卡','页面切换平滑动画、顶部标题可自定义','患者简介卡响应式修复']},
   {v:'2026.08.08-r2',date:'2026-08-08',title:'时间与治疗模块增强',items:['入院/转科动态时长、抗感染治疗模块（抗生素时长/今日提醒）','新增模块自动联动识别字典、一键超声示例','管理结构分组可折叠、类型可切换']},
   {v:'2026.08.08-r1',date:'2026-08-08',title:'基础能力完善',items:['导航三页重构、种子患者自动选中','板块可隐藏、分组可隐藏/删除','自定义识别字典支持记录状态联动']}
@@ -1479,7 +1490,7 @@ if(!pid&&db.patients&&db.patients.length){pid=db.patients[0].id;localStorage.set
 
 function patient(){return db.patients.find(p=>p.id===pid)||null}
 function recs(p){return [...(p.labs||[])].sort((a,b)=>new Date(b.time)-new Date(a.time))}
-function ensure(p){p.labs=p.labs||[];p.events=p.events||[];if(!Array.isArray(p.groups)||!p.groups.length){p.groups=cloneGroups(defaultTemplate().groups);p.templateId=p.templateId||'__default__';}delete p.customConfig;p.meds=p.meds||[];p.fluidItems=p.fluidItems||{in:['静脉输液','肠内营养','口服饮水'],out:['尿量','大便量','胃管引流','胸腔引流']};p.fluidRecords=p.fluidRecords||[];}
+function ensure(p){if(!p.scoreDraft)p.scoreDraft={crcl:{},sofa:{},apache:{},gas:{}};if(!p.scoreDraft.crcl)p.scoreDraft.crcl={};if(!p.scoreDraft.sofa)p.scoreDraft.sofa={};if(!p.scoreDraft.apache)p.scoreDraft.apache={};if(!p.scoreDraft.gas)p.scoreDraft.gas={};p.labs=p.labs||[];p.events=p.events||[];if(!Array.isArray(p.groups)||!p.groups.length){p.groups=cloneGroups(defaultTemplate().groups);p.templateId=p.templateId||'__default__';}delete p.customConfig;p.meds=p.meds||[];p.fluidItems=p.fluidItems||{in:['静脉输液','肠内营养','口服饮水'],out:['尿量','大便量','胃管引流','胸腔引流']};p.fluidRecords=p.fluidRecords||[];}
 function itemsFor(p,catId){
   ensure(p);const g=groupById(p,catId);if(!g)return[];
   return (g.fields||[]).filter(f=>!f.hidden).map(f=>({id:f.id,name:f.name,unit:f.unit||'',low:f.low,high:f.high,dir:f.dir,type:f.type||'number',options:f.options||[],showIf:f.showIf||null}));
@@ -1943,7 +1954,7 @@ function renderCultureEvents(){
   panel.innerHTML=`<h2>${esc(uiText('cultureTitle',hasGeneric?'检查与记录时间线':'培养与送检时间线'))} <span class="cnt">${events.length} 条</span></h2><div class="culture-list">${events.map(ev=>`<div class="culture-row"><div class="culture-main"><b>${esc(ev.type)}${ev.sub?` · ${esc(ev.sub)}`:''}</b> · ${esc(ev.status||'已记录')}<small>${esc(fmt(ev.time))}${ev.note?` · ${esc(ev.note)}`:''}</small></div><button data-eventdel="${esc(ev.id)}">删除</button></div>`).join('')}</div>`;
   panel.querySelectorAll('[data-eventdel]').forEach(b=>b.onclick=()=>{if(!confirm('删除这条记录？'))return;const pp=patient();pp.events=pp.events.filter(x=>x.id!==b.dataset.eventdel);save();renderAll();toast('已删除');});
 }
-function renderAll(){renderUpdateBanner();renderProfile();renderPatientSelect();updateEmptyToggle();renderQuickSnapshot();renderToday();renderBoard();renderRecords();renderCultureEvents();updateStorage();checkCount();applySectionState();renderSectionToggles();}
+function renderAll(){const sm=document.getElementById('scoreModal');if(sm&&sm.classList.contains('show')&&patient()){renderScoreTab();}renderUpdateBanner();renderProfile();renderPatientSelect();updateEmptyToggle();renderQuickSnapshot();renderToday();renderBoard();renderRecords();renderCultureEvents();updateStorage();checkCount();applySectionState();renderSectionToggles();}
 
 // ===== 板块折叠 / 整块隐藏：今日查房速查 · 今天要处理 =====
 // 折叠（只收起内容）存 localStorage；隐藏（整块不显示）存 db，随 JSON 备份一起走。
@@ -2074,51 +2085,77 @@ function saveStruct(){
 /* ===== 评分系统 ===== */
 let scoreTab='crcl';
 function lv(id){const p=patient();const r=latestVal(p,id);return r?n(r.v):null;}
-function openScore(){navTo('score');}
+function scoreDraft(tab,field){const p=patient();return p&&p.scoreDraft&&p.scoreDraft[tab]?p.scoreDraft[tab][field]:undefined;}
+function saveScoreDraft(tab,field,val){const p=patient();if(!p)return;if(!p.scoreDraft)p.scoreDraft={};if(!p.scoreDraft[tab])p.scoreDraft[tab]={};p.scoreDraft[tab][field]=val;save();}
+function saveScoreResult(tab,html){const p=patient();if(!p)return;if(!p.scoreDraft)p.scoreDraft={};if(!p.scoreDraft[tab])p.scoreDraft[tab]={};p.scoreDraft[tab]._result=html;save();}
+function scorePtTag(){const p=patient();return p?'<div class="score-pttag">当前患者：<b>'+esc(p.bed)+'床 '+esc(p.name)+'</b>'+(p.diag?' · '+esc(p.diag):'')+' <small style="font-weight:400;color:var(--muted)">（化验自动提取，缺失项手动补填）</small></div>':'';}
+function openScore(){const p=patient();if(!p){navTo('score');return;}renderScoreTab();navTo('score');}
 function scoreInput(id,label,unit,val,ph,opts){
   if(opts)return `<div class="score-item"><label class="score-sub">${label}${unit?` (${unit})`:''}</label><select id="${id}">${opts.map(o=>`<option value="${o.v}" ${String(o.v)===String(val)?'selected':''}>${o.t}</option>`).join('')}</select></div>`;
   return `<div class="score-item"><label class="score-sub">${label}${unit?` (${unit})`:''}</label><input id="${id}" type="number" step="any" value="${val!=null&&val!==''?val:''}" placeholder="${ph||''}"></div>`;
 }
 function renderScoreTab(){
   const p=patient();const body=$('#scoreBody');const res=$('#scoreResult');res.innerHTML='';
+  if(!p){body.innerHTML='<div class="empty" style="margin:40px 0"><h3>请先选择或新增患者</h3></div>';return;}
+  let okCrCl=false,okSofa=false,okAp=false;
+  const tag=document.getElementById('scorePtTag');
+  if(tag)tag.innerHTML=scorePtTag();
   if(scoreTab==='crcl'){
     $('#scoreBody').hidden=false;$('#scoreResult').hidden=false;$('#scoreGasBody').hidden=true;
-    const age=p.age||'',sex=p.sex||'男',w=p.weight||'',cr=lv('cr');
+    const age=scoreDraft('crcl','age')!==undefined?scoreDraft('crcl','age'):(p.age||'');
+    const sex=scoreDraft('crcl','sex')!==undefined?scoreDraft('crcl','sex'):(p.sex||'男');
+    const w=scoreDraft('crcl','w')!==undefined?scoreDraft('crcl','w'):(p.weight||'');
+    const cr=scoreDraft('crcl','cr')!==undefined?scoreDraft('crcl','cr'):lv('cr');
     body.innerHTML=
       scoreInput('sCrClAge','年龄','岁',age,'58')+
       `<div class="score-item"><label class="score-sub">性别</label><select id="sCrClSex"><option value="女" ${sex==='女'?'selected':''}>女</option><option value="男" ${sex!=='女'?'selected':''}>男</option></select></div>`+
       scoreInput('sCrClW','体重','kg',w,'70')+
       scoreInput('sCrClCr','血肌酐 Cr','μmol/L',cr,'')+
       `<button class="primary" id="sCrClRun" style="margin-top:6px">计算肌酐清除率</button>`;
-    $('#sCrClRun').onclick=()=>calcCrCl(false);calcCrCl(true);
+    $('#sCrClRun').onclick=()=>calcCrCl(false);okCrCl=calcCrCl(true,true);
   }else if(scoreTab==='sofa'){
     $('#scoreBody').hidden=false;$('#scoreResult').hidden=false;$('#scoreGasBody').hidden=true;
-    const pao2=lv('pao2'),cr=lv('cr'),tbil=lv('tbil'),plt=lv('plt');
+    const pao2=scoreDraft('sofa','pao2')!==undefined?scoreDraft('sofa','pao2'):lv('pao2');
+    const fio2=scoreDraft('sofa','fio2')!==undefined?scoreDraft('sofa','fio2'):21;
+    const vent=scoreDraft('sofa','vent')!==undefined?scoreDraft('sofa','vent'):0;
+    const cr=scoreDraft('sofa','cr')!==undefined?scoreDraft('sofa','cr'):lv('cr');
+    const tbil=scoreDraft('sofa','tbil')!==undefined?scoreDraft('sofa','tbil'):lv('tbil');
+    const map=scoreDraft('sofa','map')!==undefined?scoreDraft('sofa','map'):'';
+    const drug=scoreDraft('sofa','drug')!==undefined?scoreDraft('sofa','drug'):0;
+    const plt=scoreDraft('sofa','plt')!==undefined?scoreDraft('sofa','plt'):lv('plt');
+    const gcs=scoreDraft('sofa','gcs')!==undefined?scoreDraft('sofa','gcs'):lv('gcs');
     body.innerHTML=
       scoreInput('sSofaPao2','PaO₂','mmHg',pao2,'')+
-      scoreInput('sSofaFio2','FiO₂','%（填 21 / 45 等）',21,'21')+
-      `<div class="score-item"><label class="score-sub">机械通气</label><select id="sSofaVent"><option value="0" selected>否</option><option value="1">是</option></select></div>`+
+      scoreInput('sSofaFio2','FiO₂','%（填 21 / 45 等）',fio2,'21')+
+      `<div class="score-item"><label class="score-sub">机械通气</label><select id="sSofaVent"><option value="0" ${String(vent)==='0'?'selected':''}>否</option><option value="1" ${String(vent)==='1'?'selected':''}>是</option></select></div>`+
       scoreInput('sSofaCr','肌酐 Cr','μmol/L',cr,'')+
       scoreInput('sSofaTbil','总胆红素 TBIL','μmol/L',tbil,'')+
-      scoreInput('sSofaMap','平均动脉压 MAP','mmHg','')+
-      scoreInput('sSofaDrug','血管活性药','',0,[{v:0,t:'无'},{v:2,t:'多巴胺≤5 或多巴酚丁胺'},{v:3,t:'多巴胺>5 / 去甲≤0.1 / 肾上腺素≤0.1'},{v:4,t:'多巴胺>15 / 去甲>0.1 / 肾上腺素>0.1'}])+
+      scoreInput('sSofaMap','平均动脉压 MAP','mmHg',map,'')+
+      scoreInput('sSofaDrug','血管活性药','',drug,[{v:0,t:'无'},{v:2,t:'多巴胺≤5 或多巴酚丁胺'},{v:3,t:'多巴胺>5 / 去甲≤0.1 / 肾上腺素≤0.1'},{v:4,t:'多巴胺>15 / 去甲>0.1 / 肾上腺素>0.1'}])+
       scoreInput('sSofaPlt','血小板 PLT','10⁹/L',plt,'')+
-      scoreInput('sSofaGcs','GCS 评分(3-15)','',15,'')+
+      scoreInput('sSofaGcs','GCS 评分(3-15)','',gcs,'')+
       `<button class="primary" id="sSofaRun" style="margin-top:6px">计算 SOFA</button>`;
-    $('#sSofaRun').onclick=()=>calcSofa(false);calcSofa(true);
+    $('#sSofaRun').onclick=()=>calcSofa(false);okSofa=calcSofa(true,true);
   }else if(scoreTab==='gas'){
     const p2=patient();
     $('#scoreBody').hidden=true;$('#scoreResult').hidden=true;$('#scoreGasBody').hidden=false;
+    loadGasDraft();
     document.getElementById('gasResult').innerHTML=p2?'<div class="empty">填写 pH、PaCO₂、HCO₃⁻（必填）后点「运行六步法解读」，或点「填入最新血气记录」自动带入。</div>':'<div class="empty">请先选择或新增患者。</div>';
   }else{
     $('#scoreBody').hidden=false;$('#scoreResult').hidden=false;$('#scoreGasBody').hidden=true;
-    const pao2=lv('pao2'),ph=lv('ph'),na=lv('na'),k=lv('k'),cr=lv('cr'),hct=lv('hct'),wbc=lv('wbc');
+    const pao2=scoreDraft('apache','pao2')!==undefined?scoreDraft('apache','pao2'):lv('pao2');
+    const ph=scoreDraft('apache','ph')!==undefined?scoreDraft('apache','ph'):lv('ph');
+    const na=scoreDraft('apache','na')!==undefined?scoreDraft('apache','na'):lv('na');
+    const k=scoreDraft('apache','k')!==undefined?scoreDraft('apache','k'):lv('k');
+    const cr=scoreDraft('apache','cr')!==undefined?scoreDraft('apache','cr'):lv('cr');
+    const hct=scoreDraft('apache','hct')!==undefined?scoreDraft('apache','hct'):lv('hct');
+    const wbc=scoreDraft('apache','wbc')!==undefined?scoreDraft('apache','wbc'):lv('wbc');
     body.innerHTML=
-      scoreInput('sApTemp','体温','℃','')+
-      scoreInput('sApSbp','收缩压 SBP','mmHg','')+
-      scoreInput('sApDbp','舒张压 DBP','mmHg','')+
-      scoreInput('sApHr','心率 HR','次/分','')+
-      scoreInput('sApRr','呼吸 RR','次/分','')+
+      scoreInput('sApTemp','体温','℃',scoreDraft('apache','temp')!==undefined?scoreDraft('apache','temp'):lv('temperature'),'')+
+      scoreInput('sApSbp','收缩压 SBP','mmHg',scoreDraft('apache','sbp')!==undefined?scoreDraft('apache','sbp'):lv('sbp'),'')+
+      scoreInput('sApDbp','舒张压 DBP','mmHg',scoreDraft('apache','dbp')!==undefined?scoreDraft('apache','dbp'):lv('dbp'),'')+
+      scoreInput('sApHr','心率 HR','次/分',scoreDraft('apache','hr')!==undefined?scoreDraft('apache','hr'):lv('hr'),'')+
+      scoreInput('sApRr','呼吸 RR','次/分',scoreDraft('apache','rr')!==undefined?scoreDraft('apache','rr'):lv('rr'),'')+
       scoreInput('sApPao2','PaO₂','mmHg',pao2,'')+
       scoreInput('sApPh','动脉血 pH','',ph,'')+
       scoreInput('sApNa','钠 Na','mmol/L',na,'')+
@@ -2126,14 +2163,19 @@ function renderScoreTab(){
       scoreInput('sApCr','肌酐 Cr','μmol/L',cr,'')+
       scoreInput('sApHct','红细胞压积 HCT','%',hct,'')+
       scoreInput('sApWbc','白细胞 WBC','10⁹/L',wbc,'')+
-      scoreInput('sApGcs','GCS 评分','',15,'')+
-      scoreInput('sApAge','年龄','岁',p.age||'','')+
-      scoreInput('sApChronic','慢性健康状况','',0,[{v:0,t:'无'},{v:2,t:'有，且急诊术后'},{v:5,t:'有，非手术/择期术后'}])+
+      scoreInput('sApGcs','GCS 评分','',scoreDraft('apache','gcs')!==undefined?scoreDraft('apache','gcs'):(lv('gcs')!==null?lv('gcs'):15),'')+
+      scoreInput('sApAge','年龄','岁',scoreDraft('apache','age')!==undefined?scoreDraft('apache','age'):(p.age||''),'')+
+      scoreInput('sApChronic','慢性健康状况','',scoreDraft('apache','chronic')!==undefined?scoreDraft('apache','chronic'):0,[{v:0,t:'无'},{v:2,t:'有，且急诊术后'},{v:5,t:'有，非手术/择期术后'}])+
       `<button class="primary" id="sApRun" style="margin-top:6px">计算 APACHE II</button>`;
-    $('#sApRun').onclick=()=>calcApache(false);calcApache(true);
+    $('#sApRun').onclick=()=>calcApache(false);okAp=calcApache(true,true);
+  }
+  // 重算缺参数失败时，恢复该患者上次保留的结果快照
+  let autoOk = scoreTab==='crcl'?okCrCl : scoreTab==='sofa'?okSofa : scoreTab==='apache'?okAp : false;
+  if(!autoOk&&p&&p.scoreDraft&&p.scoreDraft[scoreTab]&&p.scoreDraft[scoreTab]._result!==undefined){
+    res.innerHTML=p.scoreDraft[scoreTab]._result;
   }
 }
-function calcCrCl(silent){
+function calcCrCl(silent,silentAuto){
   const age=gnum('sCrClAge'),w=gnum('sCrClW'),sex=$('#sCrClSex').value,cr=gnum('sCrClCr');
   if(age===null||w===null||cr===null||cr<=0){if(!silent)$('#scoreResult').innerHTML='<div class="empty">请先补全年龄、体重、血肌酐。</div>';return;}
   const scr=cr/88.4;
@@ -2152,6 +2194,8 @@ function calcCrCl(silent){
     <div class="risk">${band}</div>
     <div class="score-pull">Cockcroft-Gault 公式（基于血肌酐估算肌酐清除率，非真实 GFR）</div>
     ${drugTable(cl)}`;
+  if(!silentAuto){saveScoreResult('crcl',$('#scoreResult').innerHTML);saveScoreDraft('crcl','age',age);saveScoreDraft('crcl','w',w);saveScoreDraft('crcl','sex',$('#sCrClSex').value);saveScoreDraft('crcl','cr',cr);}
+  return true;
 }
 function sofaResp(pfr,vent){
   if(pfr>400)return 0;if(pfr>300)return 1;if(pfr>200)return 2;
@@ -2161,7 +2205,7 @@ function sofaRenal(cr){const m=cr/88.4;if(m<=1.2)return 0;if(m<=1.9)return 1;if(
 function sofaLiver(tb){const m=tb/17.1;if(m<=1.2)return 0;if(m<=1.9)return 1;if(m<=5.9)return 2;if(m<=11.9)return 3;return 4;}
 function sofaHema(plt){if(plt>=150)return 0;if(plt<150)return 1;if(plt<100)return 2;if(plt<50)return 3;if(plt<20)return 4;return 4;}
 function sofaCns(gcs){if(gcs>=15)return 0;if(gcs>=13)return 1;if(gcs>=10)return 2;if(gcs>=6)return 3;return 4;}
-function calcSofa(silent){
+function calcSofa(silent,silentAuto){
   const pao2=gnum('sSofaPao2'),fio2=gnum('sSofaFio2'),vent=$('#sSofaVent').value==='1';
   const cr=gnum('sSofaCr'),tbil=gnum('sSofaTbil'),map=gnum('sSofaMap'),drug=gnum('sSofaDrug'),plt=gnum('sSofaPlt'),gcs=gnum('sSofaGcs');
   if(pao2===null||fio2===null||fio2<=0||cr===null||tbil===null||map===null||plt===null||gcs===null){
@@ -2176,6 +2220,8 @@ function calcSofa(silent){
   html+='<div style="margin-top:8px">'+rows.map(x=>`<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0;border-bottom:1px solid #f0f4f6"><span>${x[0]}</span><b>${x[1]}</b></div>`).join('')+'</div>';
   html+='<div class="score-pull">SOFA 越高提示器官功能障碍越多，与院内预后相关（趋势参考）。</div>';
   $('#scoreResult').innerHTML=html;
+  if(!silentAuto){saveScoreResult('sofa',html);saveScoreDraft('sofa','pao2',pao2);saveScoreDraft('sofa','fio2',fio2);saveScoreDraft('sofa','vent',$('#sSofaVent').value);saveScoreDraft('sofa','cr',cr);saveScoreDraft('sofa','tbil',tbil);saveScoreDraft('sofa','map',map);saveScoreDraft('sofa','drug',drug);saveScoreDraft('sofa','plt',plt);saveScoreDraft('sofa','gcs',gcs);}
+  return true;
 }
 function apTemp(t){if(t>=41)return 4;if(t>=39)return 3;if(t>=38.5)return 1;if(t>=36)return 0;if(t>=34)return 1;if(t>=32)return 2;if(t>=30)return 3;return 4;}
 function apMap(m){if(m>=160)return 4;if(m>=130)return 3;if(m>=110)return 2;if(m>=70)return 0;if(m>=50)return 2;return 4;}
@@ -2190,7 +2236,7 @@ function apHct(v){if(v>=60)return 4;if(v>=50)return 2;if(v>=46)return 1;if(v>=30
 function apWbc(v){if(v>=40)return 4;if(v>=20)return 2;if(v>=15)return 1;if(v>=3)return 0;if(v>=1)return 1;return 4;}
 function apGcs(g){if(g>=15)return 0;if(g>=13)return 1;if(g>=10)return 2;if(g>=6)return 3;return 4;}
 function apAge(a){if(a>=75)return 6;if(a>=65)return 5;if(a>=55)return 3;if(a>=45)return 2;return 0;}
-function calcApache(silent){
+function calcApache(silent,silentAuto){
   const t=gnum('sApTemp'),sbp=gnum('sApSbp'),dbp=gnum('sApDbp'),hr=gnum('sApHr'),rr=gnum('sApRr'),pao2=gnum('sApPao2'),ph=gnum('sApPh'),na=gnum('sApNa'),k=gnum('sApK'),cr=gnum('sApCr'),hct=gnum('sApHct'),wbc=gnum('sApWbc'),gcs=gnum('sApGcs'),age=gnum('sApAge'),chronic=gnum('sApChronic');
   if([t,sbp,dbp,hr,rr,pao2,ph,na,k,cr,hct,wbc,gcs,age].some(x=>x===null)){
     if(!silent)$('#scoreResult').innerHTML='<div class="empty">请补全 12 项生理参数与年龄（缺失项将拉低总分）。</div>';return;
@@ -2210,6 +2256,8 @@ function calcApache(silent){
   html+=`<div class="big" style="font-size:22px;margin-top:8px">预计死亡率 <b>${mortality.toFixed(1)}%</b></div>`;
   html+=`<div class="score-pull">评分及死亡率仅为参考估算（简化 logistic 无诊断权重），不替代临床判断。</div>`;
   $('#scoreResult').innerHTML=html;
+  if(!silentAuto){saveScoreResult('apache',html);saveScoreDraft('apache','temp',t);saveScoreDraft('apache','sbp',sbp);saveScoreDraft('apache','dbp',dbp);saveScoreDraft('apache','hr',hr);saveScoreDraft('apache','rr',rr);saveScoreDraft('apache','pao2',pao2);saveScoreDraft('apache','ph',ph);saveScoreDraft('apache','na',na);saveScoreDraft('apache','k',k);saveScoreDraft('apache','cr',cr);saveScoreDraft('apache','hct',hct);saveScoreDraft('apache','wbc',wbc);saveScoreDraft('apache','gcs',gcs);saveScoreDraft('apache','age',age);saveScoreDraft('apache','chronic',chronic);}
+  return true;
 }
 
 /* 详情 */
@@ -2973,6 +3021,24 @@ function gasDiagnose(pH,PaCO2,HCO3,BE,course){
   note=note||"若实测代偿明显偏离预期范围，提示存在不止一种酸碱紊乱（混合性）。";
   return{cls,body,chips,formula,note,summary};
 }
+function loadGasDraft(){
+  const p=patient();if(!p)return;
+  const d=p.scoreDraft&&p.scoreDraft.gas?p.scoreDraft.gas:{};
+  const map={'gasPh':'ph','gasPaco2':'paco2','gasHco3':'hco3','gasNa':'na','gasCl':'cl','gasAlb':'alb','gasTemp':'temp','gasBe':'be','gasLac':'lac','gasPao2':'pao2','gasFio2':'fio2','gasAge':'age','gasSpecimen':'specimen','gasCourse':'course'};
+  Object.keys(map).forEach(id=>{const el=document.getElementById(id);if(!el)return;if(d[map[id]]!==undefined)el.value=d[map[id]];else el.value='';});
+  if(d._result!==undefined){const g=document.getElementById('gasResult');if(g)g.innerHTML=d._result;}
+}
+function bindScoreDraftAutoSave(){
+  const modal=document.getElementById('scoreModal');
+  if(!modal||modal.dataset.sdBound)return;modal.dataset.sdBound='1';
+  const fieldMap={'sCrClAge':'age','sCrClSex':'sex','sCrClW':'w','sCrClCr':'cr','sSofaPao2':'pao2','sSofaFio2':'fio2','sSofaVent':'vent','sSofaCr':'cr','sSofaTbil':'tbil','sSofaMap':'map','sSofaDrug':'drug','sSofaPlt':'plt','sSofaGcs':'gcs','sApTemp':'temp','sApSbp':'sbp','sApDbp':'dbp','sApHr':'hr','sApRr':'rr','sApPao2':'pao2','sApPh':'ph','sApNa':'na','sApK':'k','sApCr':'cr','sApHct':'hct','sApWbc':'wbc','sApGcs':'gcs','sApAge':'age','sApChronic':'chronic','gasPh':'ph','gasPaco2':'paco2','gasHco3':'hco3','gasNa':'na','gasCl':'cl','gasAlb':'alb','gasTemp':'temp','gasBe':'be','gasLac':'lac','gasPao2':'pao2','gasFio2':'fio2','gasAge':'age','gasSpecimen':'specimen','gasCourse':'course'};
+  ['input','change'].forEach(ev=>modal.addEventListener(ev,e=>{
+    const el=e.target;if(!el||!el.id)return;
+    const fld=fieldMap[el.id];if(!fld)return;
+    const tab=el.id.startsWith('gas')?'gas':(el.id.startsWith('sAp')?'apache':el.id.startsWith('sSofa')?'sofa':'crcl');
+    saveScoreDraft(tab,fld,el.value);
+  },false));
+}
 function renderGasResult(summary,steps,kv){
   let html=`<div class="gbanner ${steps[3].cls}">
       <div class="lab">综合诊断（六步法结论）</div>
@@ -2989,18 +3055,22 @@ function renderGasResult(summary,steps,kv){
     html+=`</div>`;
   });
   document.getElementById('gasResult').innerHTML=html;
+  saveScoreResult('gas',html);
 }
 function gasFillExample(type){
   const set=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v;};
   if(type==="dka"){set("gasSpecimen","arterial");set("gasPh","7.19");set("gasPaco2","15");set("gasHco3","6");set("gasNa","128");set("gasCl","94");set("gasAlb","3.5");set("gasTemp","37");set("gasBe","-20");set("gasLac","6.0");set("gasPao2","102");set("gasFio2","0.21");set("gasAge","22");document.getElementById("gasCourse").value="acute";}
   else if(type==="chronicResp"){set("gasSpecimen","arterial");set("gasPh","7.36");set("gasPaco2","62");set("gasHco3","32");set("gasNa","140");set("gasCl","92");set("gasAlb","3.8");set("gasTemp","37");set("gasBe","6");set("gasLac","1.2");set("gasPao2","58");set("gasFio2","0.21");set("gasAge","68");document.getElementById("gasCourse").value="chronic";}
   else if(type==="triple"){set("gasSpecimen","arterial");set("gasPh","7.32");set("gasPaco2","34");set("gasHco3","18");set("gasNa","140");set("gasCl","100");set("gasAlb","4.0");set("gasTemp","37");set("gasBe","-6");set("gasLac","3.0");set("gasPao2","80");set("gasFio2","0.21");set("gasAge","50");document.getElementById("gasCourse").value="acute";}
+  // 示例值同步存入当前患者草稿
+  const p=patient();if(p){const gd=p.scoreDraft&&p.scoreDraft.gas?p.scoreDraft.gas:{};const gmap={'gasPh':'ph','gasPaco2':'paco2','gasHco3':'hco3','gasNa':'na','gasCl':'cl','gasAlb':'alb','gasTemp':'temp','gasBe':'be','gasLac':'lac','gasPao2':'pao2','gasFio2':'fio2','gasAge':'age','gasSpecimen':'specimen','gasCourse':'course'};Object.keys(gmap).forEach(id=>{const el=document.getElementById(id);if(el)gd[gmap[id]]=el.value;});}
   gasAnalyze();
 }
 function gasClearAll(){
   ["gasPh","gasPaco2","gasHco3","gasNa","gasCl","gasAlb","gasTemp","gasBe","gasLac","gasPao2","gasFio2","gasAge"].forEach(id=>{const el=document.getElementById(id);if(el)el.value="";});
   document.getElementById("gasCourse").value="acute";document.getElementById("gasSpecimen").value="arterial";
   document.getElementById("gasResult").innerHTML='<div class="empty">已清空。请录入数据后运行分析。</div>';
+  const p=patient();if(p){p.scoreDraft=p.scoreDraft||{};p.scoreDraft.gas={};save();}
 }
 
 /* 种子示例 */
@@ -3388,6 +3458,7 @@ $('#gasExDka').onclick=()=>gasFillExample('dka');
 $('#gasExChronic').onclick=()=>gasFillExample('chronicResp');
 $('#gasExTriple').onclick=()=>gasFillExample('triple');
 $('#gasClearBtn').onclick=gasClearAll;
+bindScoreDraftAutoSave();
 // 关闭的若正是当前所在的主页面 → 回主界面；否则只关掉叠加的子页面，退回原主页面
 $$('[data-close]').forEach(b=>b.onclick=()=>{if(NAV_PAGES[curPage]===b.dataset.close)navTo('home');else hideViews();});
 $$('.modal-wrap').forEach(w=>w.onclick=e=>{if(e.target===w)hideViews()});
