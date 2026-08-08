@@ -1059,9 +1059,10 @@ const fmtNum=v=>{const x=parseFloat(v);if(!isFinite(x))return v;if(Math.abs(x)>=
 const n=v=>{const x=parseFloat(v);return isFinite(x)?x:null};
 function toast(s){const t=$('#notice');t.textContent=s;t.style.opacity='1';clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.opacity='0',1800);}
 /* 版本与更新提示 */
-const APP_VERSION='2026.08.08-r8';
+const APP_VERSION='2026.08.08-r9';
 const READ_VERSION_KEY='wb_lab_read_version_v1';
 const UPDATE_LOG=[
+  {v:'2026.08.08-r9',date:'2026-08-08',title:'修复 AI 识别返回为空',items:['修复致命缺陷：请求未携带化验文本（提示词 ${text} 占位符从未被替换）','自定义提示词未写占位符时，自动把化验文本追加到末尾','测试连接改用真实样本，成功时显示识别出的项目数','区分「连接失败」与「已连通但模型未按格式返回」两类提示']},
   {v:'2026.08.08-r8',date:'2026-08-08',title:'识别增强：完整识别与按日期归档',items:['修复「名称 数值 单位」三段式识别，单位不再丢失','报告头支持带时间戳（如 血液(2026-08-08 08:30):）','肺泡-动脉氧分压差(A-aDO2)恢复为可识别指标','同日记录自动追加合并，不同日期自动创建新记录','科学计数法单位（如 10^9/L）不再被误拆','AI 配置支持思考模式开关（DeepSeek V4 适配，已实测连通）']},
   {v:'2026.08.08-r7',date:'2026-08-08',title:'AI 智能录入（可配置接口）',items:['支持配置 OpenAI 兼容接口（地址/密钥/模型/路径）','报告导入新增「AI 智能识别」，自动识别化验文本','AI 返回结果校验与异常处理，失败自动回退本地解析','识别提示词可自定义，接口测试连接一键验证']},
   {v:'2026.08.08-r6',date:'2026-08-08',title:'报告导入增强：定性项与一行式报告头',items:['支持「N.报告名+子项+标本(日期):」一行式报告头','脑脊液等定性描述项（颜色/浊度/凝块/潘氏试验）自动识别','定性项以文本型字段归档，不再丢失','报告标题自动精简（如「血气分析」）']},
@@ -2908,6 +2909,16 @@ function doParsePaste(){
 /* ===== AI 智能录入（可配置 OpenAI 兼容接口） ===== */
 const AIKEY='wb_lab_ai_config_v1';
 const AIDEFAULT_PROMPT='你是一位 ICU 检验数据录入助手。请从下面的化验报告文本中提取化验项目，输出严格 JSON（不要 markdown 代码块、不要多余文字）：\n{"blocks":[{"date":"YYYY-MM-DD","title":"报告名，如 血气分析/血常规","items":[{"name":"项目名","value":"数值或定性描述","unit":"单位(没有则空字符串)","text":false}]}]}\n要求：\n1. date 必须是 4位年份-2位月份-2位日期；没有日期时用 ${defaultDate}。\n2. 项目名用标准中文名（如 PH、pO2、K+、Na+、白细胞、血红蛋白、颜色、浊度）；定性描述项（如 颜色红色血性、浊度混浊、潘氏试验阳性）text=true，value 填描述文字。\n3. 只输出报告里真实出现的项目，不要编造；同一报告多日期请分成多个 block。\n化验文本：\n${text}';
+/* 构建最终提示词：替换 ${text} / ${defaultDate} 占位符。
+   若自定义提示词未包含 ${text}，则把化验文本追加到末尾，保证 AI 一定能拿到待识别内容。 */
+function buildAiPrompt(text,cfg){
+  const tpl=(cfg&&cfg.prompt)||AIDEFAULT_PROMPT;
+  const day=(typeof todayStr==='function'?todayStr():new Date().toISOString().slice(0,10));
+  let out=tpl.replace(/\$\{\s*defaultDate\s*\}/g,day);
+  if(/\$\{\s*text\s*\}/.test(out))out=out.replace(/\$\{\s*text\s*\}/g,text||'');
+  else out=out.replace(/\s*$/,'')+'\n化验文本：\n'+(text||'');
+  return out;
+}
 function aiLoadConfig(){
   try{const x=JSON.parse(localStorage.getItem(AIKEY));if(x&&x.baseUrl)return x;}catch(e){}
   return null;
@@ -2947,7 +2958,7 @@ async function aiCall(text,cfg){
   if(cfg.apiKey)headers['Authorization']='Bearer '+cfg.apiKey;
   let res;
   try{
-    const body={model:cfg.model,temperature:0.1,messages:[{role:'user',content:cfg.prompt||AIDEFAULT_PROMPT}]};
+    const body={model:cfg.model,temperature:0.1,messages:[{role:'user',content:buildAiPrompt(text,cfg)}]};
     // DeepSeek V4 等模型：思考模式由配置决定（disabled 传 thinking 参数）
     if(cfg.thinking==='disabled')body.thinking={type:'disabled'};
     else if(cfg.thinking==='enabled')body.thinking={type:'enabled'};
@@ -3056,11 +3067,19 @@ async function aiTest(){
   hint.style.color='var(--blue2)';
   hint.textContent='正在发送最小测试请求…';
   try{
-    await aiCall('白细胞5.6',cfg);
-    hint.textContent='✅ 连接成功：接口可用，返回结构正确。';
+    const r=await aiCall('1.血常规+血液('+todayStr()+'):白细胞5.60 10^9/L ，血红蛋白135g/L',cfg);
+    const n=r.blocks.reduce((s,b)=>s+b.items.length,0);
+    hint.style.color='var(--ok,#16a34a)';
+    hint.textContent='✅ 连接成功：接口可用，本次识别出 '+n+' 项测试数据。';
   }catch(e){
-    hint.style.color='var(--danger)';
-    hint.textContent='❌ 连接失败：'+esc(e.message);
+    // 接口已连通、仅识别结果为空/格式不符 → 不算连接失败，给出区分提示
+    if(e&&(e.kind==='schema'||e.kind==='parse')){
+      hint.style.color='var(--warn,#d97706)';
+      hint.textContent='⚠️ 接口已连通，但模型未按要求返回：'+esc(e.message)+'（建议：关闭思考模式，或换用更强的模型）';
+    }else{
+      hint.style.color='var(--danger)';
+      hint.textContent='❌ 连接失败：'+esc(e.message);
+    }
   }finally{
     btn.disabled=false;btn.textContent='测试连接';
   }
