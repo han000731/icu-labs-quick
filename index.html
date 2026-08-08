@@ -436,6 +436,15 @@ textarea{resize:vertical;min-height:150px;line-height:1.5}
 /* 粘贴导入 */
 .paste-area{width:100%}
 .paste-meta{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:10px 0}
+.paste-meta .ai{background:linear-gradient(135deg,#534ab7,#7f77dd);border:0;color:#fff;border-radius:9px;min-height:40px;padding:0 14px;font-weight:700;font-size:14px;display:inline-flex;align-items:center;gap:6px;cursor:pointer}
+.paste-meta .ai:disabled{opacity:.55;cursor:wait}
+.paste-meta .ai svg{width:16px;height:16px}
+.ai-status{margin:8px 0;padding:8px 12px;border-radius:8px;font-size:13px;background:#eaf3f7;border:1px solid var(--line);color:var(--blue2)}
+.ai-status.err{background:#fcebeb;border-color:#f7c1c1;color:#a32d2d}
+.ai-status.ok{background:#eaf3de;border-color:#c0dd97;color:#3b6d11}
+.ai-form{display:grid;gap:8px;margin:8px 0}
+.ai-form label{font-size:12px;color:var(--muted);font-weight:700;display:grid;gap:4px}
+.ai-form input,.ai-form select{min-height:40px;font-size:16px;border:1px solid var(--line);border-radius:8px;padding:0 10px;width:100%;box-sizing:border-box}
 .paste-meta select{flex:1;min-width:160px;max-width:320px}
 .pb{border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin:8px 0;background:#fff}
 .pb-head{display:flex;align-items:center;gap:8px;font-size:14px;cursor:pointer}
@@ -694,6 +703,52 @@ textarea{resize:vertical;min-height:150px;line-height:1.5}
             <div id="dictList"></div>
           </section>
         </div>
+        <div class="menu-item" data-menu="ai"><span>AI 智能录入</span><span class="mi-arrow">▸</span></div>
+        <div class="menu-panel" data-menu="ai">
+          <section class="settings-card">
+            <h3>AI 智能录入（化验识别）</h3>
+            <div class="legend">配置一个兼容 OpenAI Chat Completions 的接口（支持 DeepSeek、通义千问、Kimi、智谱 GLM、OpenAI 等），报告导入页即可用 AI 识别化验文本并自动填充，减少手动录入。</div>
+            <div class="ai-form">
+              <label>接口地址（Base URL）
+                <input id="aiBaseUrl" type="text" placeholder="https://api.deepseek.com/v1" autocomplete="off">
+              </label>
+              <label>API Key（密钥）
+                <input id="aiApiKey" type="password" placeholder="sk-…" autocomplete="off">
+              </label>
+              <label>模型名称
+                <input id="aiModel" type="text" placeholder="deepseek-v4-flash" autocomplete="off">
+              </label>
+              <label>思考模式（DeepSeek V4 建议关闭，更快更省）
+                <select id="aiThinking">
+                  <option value="disabled">关闭思考（推荐）</option>
+                  <option value="auto">自动（不指定）</option>
+                  <option value="enabled">开启思考（更准但更慢）</option>
+                </select>
+              </label>
+              <label>接口路径
+                <select id="aiPath">
+                  <option value="/chat/completions">/chat/completions（标准）</option>
+                  <option value="/v1/chat/completions">/v1/chat/completions</option>
+                </select>
+              </label>
+            </div>
+            <div class="settings-actions">
+              <button class="primary" id="aiSaveBtn">保存配置</button>
+              <button id="aiTestBtn">测试连接</button>
+              <button id="aiClearBtn" class="ghost">清除配置</button>
+            </div>
+            <div class="legend" id="aiConfigHint" style="margin-top:6px"></div>
+          </section>
+          <section class="settings-card">
+            <h3>识别提示词（可自定义）</h3>
+            <div class="legend">发送给 AI 的指令模板，${text} 会被替换为粘贴的化验文本；${schema} 会替换为系统内置的项目清单。一般无需修改，接口异常或识别不理想时可调整。</div>
+            <textarea id="aiPrompt" class="paste-area" style="min-height:120px;font-size:14px"></textarea>
+          </section>
+          <section class="settings-card">
+            <h3>使用说明</h3>
+            <div class="legend">① 配置好接口并「测试连接」通过 → ② 到「报告导入」粘贴化验文本 → ③ 点「AI 智能识别」→ ④ 检查识别结果后保存。<br>接口需支持跨域（CORS）；数据仅发送到你自己配置的接口，不会上传到其他服务器。识别结果仅作辅助，保存前请人工核对。</div>
+          </section>
+        </div>
         <div class="menu-item" data-menu="ui"><span>界面设置</span><span class="mi-arrow">▸</span></div>
         <div class="menu-panel" data-menu="ui">
           <section class="settings-card">
@@ -820,8 +875,10 @@ textarea{resize:vertical;min-height:150px;line-height:1.5}
         <select id="pastePatient"></select>
         <input type="date" id="pasteDate" title="自由粘贴时使用的日期（报告带日期则以其为准）">
         <button class="primary" id="parsePasteBtn"></button>
+        <button class="ai" id="aiParseBtn" title="使用已配置的 AI 接口识别化验文本">AI 智能识别</button>
         <button id="clearPasteBtn"></button>
       </div>
+      <div id="aiStatus" class="ai-status" hidden></div>
       <div id="pastePreview"></div>
     </div>
     <div class="modal-foot">
@@ -1002,9 +1059,13 @@ const fmtNum=v=>{const x=parseFloat(v);if(!isFinite(x))return v;if(Math.abs(x)>=
 const n=v=>{const x=parseFloat(v);return isFinite(x)?x:null};
 function toast(s){const t=$('#notice');t.textContent=s;t.style.opacity='1';clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.opacity='0',1800);}
 /* 版本与更新提示 */
-const APP_VERSION='2026.08.08-r4';
+const APP_VERSION='2026.08.08-r8';
 const READ_VERSION_KEY='wb_lab_read_version_v1';
 const UPDATE_LOG=[
+  {v:'2026.08.08-r8',date:'2026-08-08',title:'识别增强：完整识别与按日期归档',items:['修复「名称 数值 单位」三段式识别，单位不再丢失','报告头支持带时间戳（如 血液(2026-08-08 08:30):）','肺泡-动脉氧分压差(A-aDO2)恢复为可识别指标','同日记录自动追加合并，不同日期自动创建新记录','科学计数法单位（如 10^9/L）不再被误拆','AI 配置支持思考模式开关（DeepSeek V4 适配，已实测连通）']},
+  {v:'2026.08.08-r7',date:'2026-08-08',title:'AI 智能录入（可配置接口）',items:['支持配置 OpenAI 兼容接口（地址/密钥/模型/路径）','报告导入新增「AI 智能识别」，自动识别化验文本','AI 返回结果校验与异常处理，失败自动回退本地解析','识别提示词可自定义，接口测试连接一键验证']},
+  {v:'2026.08.08-r6',date:'2026-08-08',title:'报告导入增强：定性项与一行式报告头',items:['支持「N.报告名+子项+标本(日期):」一行式报告头','脑脊液等定性描述项（颜色/浊度/凝块/潘氏试验）自动识别','定性项以文本型字段归档，不再丢失','报告标题自动精简（如「血气分析」）']},
+  {v:'2026.08.08-r5',date:'2026-08-08',title:'化验报告智能导入',items:['整段粘贴多日期化验报告，自动识别日期与化验项','支持「序号.报告名 + 标本(日期):」两行式报告头','按日期自动归档，同日重复导入自动去重','未收录的化验指标自动创建（血脂/免疫/尿检等）','血气仪派生项自动过滤，避免垃圾指标']},
   {v:'2026.08.08-r4',date:'2026-08-08',title:'评分系统按患者联动',items:['评分手动补填值按患者分别保存（切人不丢）','评分页顶部显示当前患者、切换后自动刷新','APACHE II 自动提取体温/血压/心率/呼吸','血气分析草稿与结果按患者独立保留','化验更新后评分自动按最新值重算']},
   {v:'2026.08.08-r3',date:'2026-08-08',title:'查房台整体重构',items:['新增「药物使用记录」「出入量」独立页面','底部导航可拖拽排序、标签可自定义','「我的」改为二级菜单、患者切换并入简介卡','页面切换平滑动画、顶部标题可自定义','患者简介卡响应式修复']},
   {v:'2026.08.08-r2',date:'2026-08-08',title:'时间与治疗模块增强',items:['入院/转科动态时长、抗感染治疗模块（抗生素时长/今日提醒）','新增模块自动联动识别字典、一键超声示例','管理结构分组可折叠、类型可切换']},
@@ -1294,6 +1355,17 @@ const SYN={
   'hco3':{id:'hco3'},'hco3-':{id:'hco3'},'hco3-c':{id:'hco3'},'hco3c':{id:'hco3'},
   'be':{id:'be'},'碱剩余':{id:'be'}
 };
+/* 血气分析仪缩写映射（样本来自血气仪导出，c前缀=计算值） */
+Object.assign(SYN,{
+  'cna':{id:'na'},'cna+':{id:'na'},'cnk':{id:'k'},'ck+':{id:'k'},
+  'ccl-':{id:'cl'},'ccl':{id:'cl'},'cca':{id:'ca'},'cca2+':{id:'ca'},
+  'cglu':{id:'glu'},'clac':{id:'lac'},'clactate':{id:'lac'},
+  'chco-3':{id:'hco3'},'chco-3(p)':{id:'hco3'},'hco3-c':{id:'hco3'},
+  'sao2':{id:'sao2'},'so2c':{id:'sao2'},'cthb':{id:'hgb'},'hgb':{id:'hgb'},
+  'hco3(pst)':{id:'hco3'},'hco3(p st)':{id:'hco3'},'be(act)':{id:'be'},'be(ecf)':{id:'be'},
+  'abbe':{id:'be'},'sbe':{id:'be'},
+  '肺泡-动脉氧分压差':{id:'aado2'},'aado2':{id:'aado2'},'肺泡动脉氧分压差':{id:'aado2'},'肺泡-动脉氧分压差(t)':{id:'aado2'},'肺泡-动脉氧分压差t':{id:'aado2'}
+});
 /* 常用别名/口语化写法，配合下方「类比」匹配，提升自由输入的识别率 */
 Object.assign(SYN,{
   'ph':{id:'ph'},'pH':{id:'ph'},'PH':{id:'ph'},'酸碱度':{id:'ph'},
@@ -1324,8 +1396,27 @@ Object.assign(SYN,{
   'apache ii':{id:'apache2'},'apache2':{id:'apache2'},'apache':{id:'apache2'},
   'rass':{id:'rass'},'镇静评分':{id:'rass'}
 });
-const SKIP_NAMES=new Set(['ph(t)','po2(t)','pco2(t)','so2c','hco3(pst)','be(act)','be(ecf)','h+','bb','ag','cto2','ca(7.4)c','o2hb','cohb','hhb','methb','肺泡-动脉氧分压差','ph(t )','po2(t )']);
+const SKIP_NAMES=new Set(['ph(t)','po2(t)','pco2(t)','h+','bb','ag','cto2','ca(7.4)c','o2hb','cohb','hhb','methb','aniongap','mosm','p50','p50(st)','t)/fo','7.40)','c()','ct(','ri','ri-','ri%','fo2(i)','t)/fo2']);
 const INTERF=['脂血','溶血','黄疸','浑浊','标本'];
+// 仪器派生项/解析碎片判定：这些不应被当作新化验指标自动创建
+function isJunkName(nm){
+  if(!nm)return true;
+  const t=nm.trim();
+  if(!t)return true;
+  const low=t.toLowerCase();
+  if([...SKIP_NAMES].some(s=>low.includes(s)))return true;
+  // 序号残留（如「62.血清白介素」「1.血气分析」被误解析为项目名）
+  if(/^\d+\./.test(t))return true;
+  // 括号不配对（T)、ST)、7.40) 等解析碎片）
+  if(/[)）]/.test(t)&&!/[（(]/.test(t))return true;
+  // 纯符号/纯数字
+  if(/^[^a-zA-Z\u4e00-\u9fff]+$/.test(t))return true;
+  // 单字符或「单字母+括号」残留（p、T)、cHCO- 等），但不误杀合法项
+  if(/^[a-zA-Z()]{1,3}$/.test(t)&&!/^(ph|be|k|na|cl|ca|glu|pt|tt|inr|cr|hct|pct|alt|ast|tbil|dbil|alb|wbc|rbc|hgb|plt)$/i.test(t))return true;
+  // 定性描述（如「脂肪球-」「细菌-」阴性项无数值意义）
+  if(/^[\u4e00-\u9fff]{2,8}[-－]$/.test(t))return true;
+  return false;
+}
 
 function normName(s){return s.replace(/^[★☆]\s*/,'').replace(/[（(][^（）()]*[)）]/g,'').replace(/[+\-]+$/,'').trim();}
 function synId(rawName){
@@ -1372,7 +1463,7 @@ function hashId(s){let h=5381;for(let i=0;i<s.length;i++)h=((h<<5)+h+s.charCodeA
 let DICT={};try{const x=JSON.parse(localStorage.getItem(DICTKEY));if(x&&typeof x==='object')DICT=x;}catch(e){}
 function saveDict(){localStorage.setItem(DICTKEY,JSON.stringify(DICT));}
 
-function resolveItem(p,rawName,unit,flag){
+function resolveItem(p,rawName,unit,flag,isText){
   const id=synId(rawName);
   if(id)return{id,learned:false};
   const cat=inferCat(rawName);
@@ -1380,7 +1471,7 @@ function resolveItem(p,rawName,unit,flag){
   let meta=DICT[lid];
   if(!meta){meta={id:lid,name:normName(rawName),unit:unit||'',low:0,high:1e9,dir:''};DICT[lid]=meta;saveDict();}
   let g=groupById(p,cat)||groupsOf(p).find(x=>x.type!=='record');
-  if(g&&!(g.fields||[]).some(x=>x.id===lid))(g.fields=g.fields||[]).push({id:lid,name:meta.name,unit:meta.unit||'',type:'number',low:meta.low,high:meta.high,dir:meta.dir||'',hidden:false,options:[],showIf:null});
+  if(g&&!(g.fields||[]).some(x=>x.id===lid))(g.fields=g.fields||[]).push({id:lid,name:meta.name,unit:isText?'':(meta.unit||''),type:isText?'text':'number',low:meta.low,high:meta.high,dir:meta.dir||'',hidden:false,options:[],showIf:null});
   return{id:lid,learned:true,cat:g?g.id:cat};
 }
 
@@ -1393,11 +1484,16 @@ function parseToken(tok){
   if([...SKIP_NAMES].some(s=>t2.includes(s)))return null;
   let s=tok.replace(/^[★☆]\s*/,'');
   s=s.replace(/(pO2|pCO2|SO2)(?=\d)/gi,'$1 ');
-  const nums=[...s.matchAll(/\d+(?:\.\d+)?/g)].map(mm=>({i:mm.index,v:mm[0],rest:s.slice(mm.index+mm[0].length)}));
+  const nums=[...s.matchAll(/(?<!\^)\d+(?:\.\d+)?(?!\^)/g)].map(mm=>({i:mm.index,v:mm[0],rest:s.slice(mm.index+mm[0].length)}));
   if(!nums.length)return null;
   const unitStart=/^\s*[A-Za-zα-ω%×*µμ↑↓（(]/;
   let pick=nums.find(n=>unitStart.test(n.rest))||nums[nums.length-1];
   let nameRaw=s.slice(0,pick.i).trim();
+  // 名称以「-」结尾（如 cHCO-3(P) 的下标 3），说明该数字是名称的一部分，改用下一个数字
+  if(/[A-Za-z\u4e00-\u9fff]-$/.test(nameRaw)){
+    const idx=nums.indexOf(pick);
+    if(idx>=0&&idx<nums.length-1){pick=nums[idx+1];nameRaw=s.slice(0,pick.i).trim();}
+  }
   if(!nameRaw)return null;
   nameRaw=nameRaw.replace(/[:：、，,；;]+$/,''); // 去掉名称后可能残留的冒号/标点（如「白细胞：2.3」）
   let rest=pick.rest;
@@ -1405,9 +1501,25 @@ function parseToken(tok){
   const fm=rest.match(/([↑↓]+)\s*$/);
   if(fm){flag=fm[1];rest=rest.slice(0,fm.index);}
   const unit=rest.trim();
+  if(isJunkName(nameRaw))return null;
   return{nameRaw,value:pick.v,unit,flag};
 }
 function todayStr(){const d=new Date();const p=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate());}
+/* 定性描述项解析（无数字值，如「颜色红色血性」「浊度混浊」「凝块无」「潘氏试验阳性」）
+   返回 text 型项目，值保留原文描述 */
+const QUAL_WORDS=['红色血性','血性','混浊','浑浊','清亮','透明','微浑','淡黄','脓性','絮状','凝块','阳性','阴性','弱阳性','无凝块','未见异常','正常','无'];
+function parseQualitative(tok){
+  const t=String(tok||'').trim();
+  if(!t)return null;
+  if(/^\d/.test(t))return null;
+  for(const w of QUAL_WORDS){
+    if(t.endsWith(w)&&t.length>w.length){
+      const name=t.slice(0,t.length-w.length).trim();
+      if(/^[\u4e00-\u9fff]{2,12}$/.test(name))return{nameRaw:name,value:w,unit:'',flag:'',text:true};
+    }
+  }
+  return null;
+}
 /* 自由文本解析：无报告头时，把整段作为一个块，按「名称+数值」识别 */
 function parseFreeText(text){
   const parts=text.split(/[，,；;、\n\r\s]+/).map(t=>t.trim()).filter(Boolean);
@@ -1415,13 +1527,26 @@ function parseFreeText(text){
   for(let i=0;i<parts.length;i++){
     const cur=parseToken(parts[i]);
     if(cur&&cur.value){toks.push(cur);continue;}
+    // 定性描述项（如「颜色红色血性」「潘氏试验阳性」「凝块无」）
+    const q=parseQualitative(parts[i]);
+    if(q){toks.push(q);continue;}
     // 名称后跟数值（如「白细胞 2.3」「平均红细胞体积 90」用空格分隔）
     if(i+1<parts.length&&/^\d+(?:\.\d+)?$/.test(parts[i+1])){
+      // 三段式「名称 数值 单位」：如「Na+ 165.30 mmol/L」「白细胞 10.28 10^9/L」——单位在第三段
+      const unitRe=/^[A-Za-zµμ%×^·\/℃0-9.*-]+$/;
+      if(i+2<parts.length&&unitRe.test(parts[i+2])){
+        const nameRaw=parts[i].replace(/[:：、，,；;]+$/,'').trim();
+        if(nameRaw&&!/^[\u4e00-\u9fff]{1}$/.test(nameRaw)){
+          const id=synId(nameRaw);let cat=inferCat(nameRaw);if(id){const c=catOfId(id);if(c)cat=c;}
+          toks.push({nameRaw,value:parts[i+1],unit:parts[i+2],flag:'',known:id!=null,cat,text:false});
+          i+=2;continue;
+        }
+      }
       const m=parseToken(parts[i]+' '+parts[i+1]);
       if(m&&m.value){toks.push(m);i++;continue;}
     }
   }
-  return toks.map(t=>{const id=synId(t.nameRaw);let cat=inferCat(t.nameRaw);if(id){const c=catOfId(id);if(c)cat=c;}return{nameRaw:t.nameRaw,value:t.value,unit:t.unit,flag:t.flag,known:id!=null,cat};});
+  return toks.map(t=>{const id=synId(t.nameRaw);let cat=inferCat(t.nameRaw);if(id){const c=catOfId(id);if(c)cat=c;}return{nameRaw:t.nameRaw,value:t.value,unit:t.unit,flag:t.flag,known:id!=null,cat,text:t.text||false};});
 }
 function parsePaste(text,defaultDate){
   const escRe=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
@@ -1433,8 +1558,33 @@ function parsePaste(text,defaultDate){
     hs.push({title:t,date:m[3],hstart:m.index,headEnd:m.index+m[0].length});
   }return hs;}
   // 强制「数字+点」前缀，避免把上一个块溢出的值（如 C-反应蛋白126.35mg/L↑7.1.…）误判为报告头
-  let heads=collect(/(\d+\.)+\s*([^，,\s()]*?)\s*\((\d{4}-\d{2}-\d{2})\)\s*:/g);
-  if(!heads.length)heads=collect(/(\d+\.)*\s*([^，,\s()]*?)\s*\((\d{4}-\d{2}-\d{2})\)\s*:/g);
+  // 日期支持带时间戳：血液(2026-08-08 08:30): 或 血液(2026-08-08): 均识别，日期取前 10 位
+  const dateInHead=/\((\d{4}[-/.]\d{1,2}[-/.]\d{1,2})(?:[ T]\d{1,2}:\d{2}(?::\d{2})?)?\)\s*:/;
+  let heads=collect(/(\d+\.)+\s*([^，,\s()]*?)\s*\((\d{4}[-/.]\d{1,2}[-/.]\d{1,2})(?:[ T]\d{1,2}:\d{2}(?::\d{2})?)?\)\s*:/g);
+  if(!heads.length)heads=collect(/(\d+\.)*\s*([^，,\s()]*?)\s*\((\d{4}[-/.]\d{1,2}[-/.]\d{1,2})(?:[ T]\d{1,2}:\d{2}(?::\d{2})?)?\)\s*:/g);
+  // 归一化日期为 YYYY-MM-DD（兼容 2026/8/8、2026.08.08 等写法）
+  heads.forEach(h=>{
+    const dm=h.date.match(/(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+    if(dm)h.date=dm[1]+'-'+String(+dm[2]).padStart(2,'0')+'-'+String(+dm[3]).padStart(2,'0');
+  });
+  // 两行式报告头增强：样本形如「1.血气分析\n电解质（钾钠氯钙）\n动脉血(2026-08-08):」——
+  // 「N.报告名」与「标本(日期):」分行。这里把报告名行与紧随其后的日期行合并，标题取报告名。
+  if(heads.length){
+    const nameRows=[];
+    let nm;
+    const nameRe=/(\d{1,3})\.\s*([\u4e00-\u9fff][^\d\n]{0,14}?)\s*(?=\n|$)/g;
+    while((nm=nameRe.exec(text))!==null){
+      const n=nm[2].trim().replace(/[，,、。\s]+$/,'');
+      if(n&&!/[0-9]/.test(n)&&!/[：:]/.test(n))nameRows.push({name:n,pos:nm.index});
+    }
+    heads.forEach((h,hi)=>{
+      let best=null;
+      for(const r of nameRows){
+        if(r.pos<h.hstart&&(hi===0||r.pos>heads[hi-1].hstart)){if(!best||r.pos>best.pos)best=r;}
+      }
+      if(best)h.title=best.name;
+    });
+  }
   const out={blocks:[]};
   if(heads.length){
   for(let i=0;i<heads.length;i++){
@@ -1447,7 +1597,7 @@ function parsePaste(text,defaultDate){
     }
     const items=parseFreeText(content);
     if(!items.length)continue;
-    const title=b.title.replace(/^[，,\s]*/,'').replace(/^(脂血|溶血|黄疸|浑浊)\s*[+＋]?\s*\d*(?:\.\d+)*\.?\s*/,'').replace(/^\d+\.(?:\d+\.)*/,'').trim();
+    const title=b.title.replace(/^[，,\s]*/,'').replace(/^(脂血|溶血|黄疸|浑浊)\s*[+＋]?\s*\d*(?:\.\d+)*\.?\s*/,'').replace(/^\d+\.(?:\d+\.)*/,'').replace(/\s*\+.*$/,'').trim();
     out.blocks.push({date:b.date,title:title,items});
   }
   }else{
@@ -2750,15 +2900,170 @@ function doParsePaste(){
   if(!txt.trim()){toast('请先粘贴报告');return}
   const r=parsePaste(txt,$('#pasteDate').value||todayStr());
   if(r.error){parsedResult=null;$('#savePasteBtn').disabled=true;$('#pastePreview').innerHTML=`<div class="pb-none">${esc(r.error)}</div>`;toast('解析失败');return}
-  parsedResult=r;
+  parsedResult=r;aiParsedResult=null;
+  renderPastePreview(r);
+  toast(`解析成功：${r.blocks.length} 份报告`);
+}
+
+/* ===== AI 智能录入（可配置 OpenAI 兼容接口） ===== */
+const AIKEY='wb_lab_ai_config_v1';
+const AIDEFAULT_PROMPT='你是一位 ICU 检验数据录入助手。请从下面的化验报告文本中提取化验项目，输出严格 JSON（不要 markdown 代码块、不要多余文字）：\n{"blocks":[{"date":"YYYY-MM-DD","title":"报告名，如 血气分析/血常规","items":[{"name":"项目名","value":"数值或定性描述","unit":"单位(没有则空字符串)","text":false}]}]}\n要求：\n1. date 必须是 4位年份-2位月份-2位日期；没有日期时用 ${defaultDate}。\n2. 项目名用标准中文名（如 PH、pO2、K+、Na+、白细胞、血红蛋白、颜色、浊度）；定性描述项（如 颜色红色血性、浊度混浊、潘氏试验阳性）text=true，value 填描述文字。\n3. 只输出报告里真实出现的项目，不要编造；同一报告多日期请分成多个 block。\n化验文本：\n${text}';
+function aiLoadConfig(){
+  try{const x=JSON.parse(localStorage.getItem(AIKEY));if(x&&x.baseUrl)return x;}catch(e){}
+  return null;
+}
+function aiSaveConfig(cfg){localStorage.setItem(AIKEY,JSON.stringify(cfg));}
+function aiClearConfig(){localStorage.removeItem(AIKEY);}
+function aiFillForm(){
+  const cfg=aiLoadConfig();
+  $('#aiBaseUrl').value=cfg?cfg.baseUrl:'';
+  $('#aiApiKey').value=cfg?cfg.apiKey:'';
+  $('#aiModel').value=cfg?cfg.model:'';
+  $('#aiPath').value=(cfg&&cfg.path)||'/chat/completions';
+  $('#aiThinking').value=(cfg&&cfg.thinking)||'disabled';
+  $('#aiPrompt').value=(cfg&&cfg.prompt)||'';
+}
+function aiReadForm(){
+  const baseUrl=$('#aiBaseUrl').value.trim();
+  const apiKey=$('#aiApiKey').value.trim();
+  const model=$('#aiModel').value.trim();
+  const path=$('#aiPath').value;
+  const thinking=$('#aiThinking').value;
+  const prompt=$('#aiPrompt').value.trim();
+  if(!baseUrl||!model){toast('请填写接口地址与模型名称');return null;}
+  return{baseUrl,apiKey,model,path,prompt,thinking};
+}
+function aiEndpoint(cfg){
+  let u=cfg.baseUrl.replace(/\/+$/,'');
+  let p=cfg.path||'/chat/completions';
+  if(!p.startsWith('/'))p='/'+p;
+  return u+p;
+}
+/* 调用 AI 接口，返回解析后的 {blocks:[...]}；异常抛出 {message, kind} */
+async function aiCall(text,cfg){
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),60000);
+  const headers={'Content-Type':'application/json'};
+  if(cfg.apiKey)headers['Authorization']='Bearer '+cfg.apiKey;
+  let res;
+  try{
+    const body={model:cfg.model,temperature:0.1,messages:[{role:'user',content:cfg.prompt||AIDEFAULT_PROMPT}]};
+    // DeepSeek V4 等模型：思考模式由配置决定（disabled 传 thinking 参数）
+    if(cfg.thinking==='disabled')body.thinking={type:'disabled'};
+    else if(cfg.thinking==='enabled')body.thinking={type:'enabled'};
+    res=await fetch(aiEndpoint(cfg),{method:'POST',headers,body:JSON.stringify(body),signal:controller.signal});
+  }catch(e){
+    clearTimeout(timer);
+    if(e.name==='AbortError')throw{message:'接口请求超时（60秒），请检查接口地址或网络',kind:'timeout'};
+    throw{message:'网络请求失败：'+(e.message||'无法连接接口'),kind:'network'};
+  }
+  clearTimeout(timer);
+  if(!res.ok){
+    let detail='';
+    try{const j=await res.json();detail=(j&&(j.error&&(j.error.message||j.error))||j.message)||'';}catch(e){}
+    throw{message:`接口返回错误 ${res.status}${detail?'：'+detail:''}`,kind:'http'};
+  }
+  let data;
+  try{data=await res.json();}catch(e){throw{message:'接口返回不是合法 JSON',kind:'parse'};}
+  const content=data&&data.choices&&data.choices[0]&&data.choices[0].message&&data.choices[0].message.content;
+  if(!content){throw{message:'接口返回缺少 choices[0].message.content',kind:'parse'};}
+  // 提取 JSON（容忍 markdown 代码块包裹）
+  let m=content.match(/```(?:json)?\s*([\s\S]*?)```/);
+  const raw=m?m[1]:content;
+  let obj;
+  try{obj=JSON.parse(raw.trim());}catch(e){
+    // 尝试截取第一个 { 到最后一个 }
+    const a=raw.indexOf('{'),b=raw.lastIndexOf('}');
+    if(a>=0&&b>a){try{obj=JSON.parse(raw.slice(a,b+1));}catch(e2){throw{message:'AI 返回内容不是有效 JSON，请检查提示词或模型',kind:'parse'};}}
+    else throw{message:'AI 返回内容不是有效 JSON，请检查提示词或模型',kind:'parse'};
+  }
+  return normalizeAiResult(obj);
+}
+/* 校验并规范化 AI 返回结果 */
+function normalizeAiResult(obj){
+  if(!obj||!Array.isArray(obj.blocks))throw{message:'AI 返回缺少 blocks 数组',kind:'schema'};
+  const blocks=[];
+  obj.blocks.forEach(b=>{
+    if(!b||!Array.isArray(b.items)||!b.items.length)return;
+    let date=String(b.date||'').trim();
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(date)){
+      const m=date.match(/(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})/);
+      if(m)date=m[1]+'-'+String(m[2]).padStart(2,'0')+'-'+String(m[3]).padStart(2,'0');
+      else date=todayStr();
+    }
+    const items=[];
+    b.items.forEach(it=>{
+      const name=String(it.name||'').trim();
+      if(!name)return;
+      const value=String(it.value===undefined||it.value===null?'':it.value).trim();
+      if(!value)return;
+      const text=!!it.text;
+      // 校验：数值型必须是数字（允许 ± 与科学计数），否则按定性处理
+      const unit=String(it.unit||'').trim();
+      if(!text&&!isNaN(parseFloat(value))&&/^-?\d/.test(value))items.push({nameRaw:name,value,unit,flag:'',known:synId(name)!=null,cat:inferCat(name),text:false});
+      else items.push({nameRaw:name,value,unit:'',flag:'',known:synId(name)!=null,cat:inferCat(name),text:true});
+    });
+    if(items.length)blocks.push({date,title:String(b.title||'AI识别').trim(),items});
+  });
+  if(!blocks.length)throw{message:'AI 未能识别出化验项（返回为空）',kind:'schema'};
+  return{blocks};
+}
+/* AI 识别主入口：调用接口 → 结果合并到预览 */
+let aiParsedResult=null;
+async function doAiParse(){
+  const txt=$('#pasteText').value;
+  if(!txt.trim()){toast('请先粘贴报告');return}
+  const cfg=aiLoadConfig();
+  if(!cfg){toast('请先在「我的 → AI 智能录入」配置接口');return}
+  const btn=$('#aiParseBtn'),st=$('#aiStatus');
+  btn.disabled=true;btn.textContent='AI 识别中…';
+  st.hidden=false;st.className='ai-status';st.innerHTML='正在调用 AI 接口识别化验文本…';
+  try{
+    const r=await aiCall(txt,cfg);
+    // 用 AI 结果替换预览（本地解析作为兜底：若 AI 失败则回退）
+    parsedResult=r;aiParsedResult=r;
+    renderPastePreview(r);
+    st.className='ai-status ok';
+    st.innerHTML=`AI 识别完成：${r.blocks.length} 份报告。已替代本地解析结果，保存前请人工核对。`;
+    toast(`AI 识别完成：${r.blocks.length} 份报告`);
+  }catch(e){
+    st.className='ai-status err';
+    st.innerHTML='AI 识别失败：'+esc(e.message||'未知错误');
+    toast('AI 识别失败');
+    // 回退：本地解析
+    const local=parsePaste(txt,$('#pasteDate').value||todayStr());
+    if(!local.error){parsedResult=local;aiParsedResult=null;renderPastePreview(local);st.innerHTML+='<br>已回退为本地规则解析。';}
+  }finally{
+    btn.disabled=false;btn.textContent='AI 智能识别';
+  }
+}
+/* 预览渲染（供 AI 与本地共用） */
+function renderPastePreview(r){
   $('#pastePreview').innerHTML=r.blocks.map((b,i)=>{
-    const chips=b.items.map(it=>`<span class="gchip"><span class="k">${esc(normName(it.nameRaw))}</span><span class="v">${esc(it.value)}${esc(it.unit||'')}${it.flag?(' '+it.flag):''}</span><span class="cat">${esc(catTitleById(it.cat))}</span>${it.known?'':' <b style="color:var(--amber)">新</b>'}</span>`).join('');
+    const chips=b.items.map(it=>`<span class="gchip"><span class="k">${esc(normName(it.nameRaw))}</span><span class="v">${esc(it.value)}${it.text?'':esc(it.unit||'')}${it.flag?(' '+it.flag):''}</span><span class="cat">${esc(catTitleById(it.cat))}</span>${it.known?'':' <b style="color:var(--amber)">新</b>'}</span>`).join('');
     return `<div class="pb"><label class="pb-head"><input type="checkbox" data-pb="${i}" checked> <b>${esc(b.date)}</b> · ${esc(b.title)} · ${b.items.length} 项${b.items.some(x=>!x.known)?' · 含新学项目':''}</label><div class="pb-chips">${chips}</div></div>`;
   }).join('');
   const newCnt=r.blocks.reduce((s,b)=>s+b.items.filter(x=>!x.known).length,0);
   $('#savePasteBtn').disabled=false;
   $('#savePasteBtn').textContent=`保存 ${r.blocks.length} 条记录${newCnt?`（新学 ${newCnt} 项）`:''}`;
-  toast(`解析成功：${r.blocks.length} 份报告`);
+}
+/* 测试连接 */
+async function aiTest(){
+  const cfg=aiReadForm();
+  if(!cfg)return;
+  const btn=$('#aiTestBtn'),hint=$('#aiConfigHint');
+  btn.disabled=true;btn.textContent='测试中…';
+  hint.style.color='var(--blue2)';
+  hint.textContent='正在发送最小测试请求…';
+  try{
+    await aiCall('白细胞5.6',cfg);
+    hint.textContent='✅ 连接成功：接口可用，返回结构正确。';
+  }catch(e){
+    hint.style.color='var(--danger)';
+    hint.textContent='❌ 连接失败：'+esc(e.message);
+  }finally{
+    btn.disabled=false;btn.textContent='测试连接';
+  }
 }
 function savePaste(){
   if(!parsedResult)return;
@@ -2768,19 +3073,24 @@ function savePaste(){
   ensure(p);
   const checked=[...document.querySelectorAll('#pastePreview input[data-pb]:checked')].map(c=>+c.dataset.pb);
   if(!checked.length){toast('请勾选要保存的报告');return;}
-  let learned=0,recCount=0;
+  let learned=0,recCount=0,mergedCount=0;
   parsedResult.blocks.forEach((blk,bi)=>{
     if(!checked.includes(bi))return;
     const values={};
-    blk.items.forEach(it=>{const r=resolveItem(p,it.nameRaw,it.unit,it.flag);if(r.learned)learned++;values[r.id]=it.value;});
-    if(Object.keys(values).length){const time=blk.date+'T08:'+String(5+bi*5).padStart(2,'0');p.labs.push({id:uid(),time,values});recCount++;}
+    blk.items.forEach(it=>{const r=resolveItem(p,it.nameRaw,it.unit,it.flag,it.text);if(r.learned)learned++;values[r.id]=it.value;});
+    if(!Object.keys(values).length)return;
+    // 按日期自动创建/追加：同一天已有记录则把新值并入该记录（保留旧值，同名项以新值为准）
+    const day=String(blk.date).slice(0,10);
+    const existing=p.labs.find(r=>String(r.time).slice(0,10)===day);
+    if(existing){Object.assign(existing.values,values);mergedCount++;}
+    else{const time=day+'T08:'+String(5+recCount*5).padStart(2,'0');p.labs.push({id:uid(),time,values});recCount++;}
   });
-  if(!recCount){toast('没有可保存的记录');return;}
+  if(!recCount&&!mergedCount){toast('没有可保存的记录');return;}
   p.labs.sort((a,b)=>new Date(b.time)-new Date(a.time));
   save();
   hideViews();
   renderAll();
-  toast(`已保存 ${recCount} 条记录${learned?`，新学 ${learned} 项`:''}`);
+  toast(`已保存 ${recCount} 条新记录${mergedCount?`，同日合并 ${mergedCount} 条`:''}${learned?`，新学 ${learned} 项`:''}`);
 }
 
 /* ===== 血气分析六步法（移植自参考实现，适配浅色主题） ===== */
@@ -3239,7 +3549,7 @@ let pmInited=false;
 function enterMyPage(){
   const el=$('#pmModal');if(el)el.classList.add('show');
   if(!pmInited){pmClearForm();$('#pmEditId').value='';$('#pmEditHint').hidden=true;$('#savePatientBtn').textContent='保存患者';pmInited=true;}
-  renderTopButtons();renderPMList();renderCustomDict();renderSectionToggles();renderTplSelect();renderNavSettings();renderUpdateLog();updateStorage();
+  renderTopButtons();renderPMList();renderCustomDict();renderSectionToggles();renderTplSelect();renderNavSettings();renderUpdateLog();updateStorage();aiFillForm();
 }
 /* 药物页：患者选择与筛选保留，列表每次刷新 */
 let medInited=false;
@@ -3450,8 +3760,20 @@ $('#quickNow').onclick=()=>{$('#quickTime').value=localTime();};
 $('#quickClear').onclick=()=>{$('#quickText').value='';$('#quickPreview').innerHTML='';quickParsed=null;$('#quickSave').disabled=true;};
 $('#quickText').addEventListener('input',()=>{quickParsed=null;$('#quickSave').disabled=true;});
 $('#parsePasteBtn').onclick=doParsePaste;
-$('#clearPasteBtn').onclick=()=>{$('#pasteText').value='';$('#pastePreview').innerHTML='<div class="pb-none">已清空。</div>';parsedResult=null;$('#savePasteBtn').disabled=true;};
+$('#clearPasteBtn').onclick=()=>{$('#pasteText').value='';$('#pastePreview').innerHTML='<div class="pb-none">已清空。</div>';parsedResult=null;aiParsedResult=null;$('#savePasteBtn').disabled=true;$('#aiStatus').hidden=true;};
 $('#savePasteBtn').onclick=savePaste;
+$('#aiParseBtn').onclick=doAiParse;
+$('#aiSaveBtn').onclick=()=>{
+  const cfg=aiReadForm();if(!cfg)return;
+  cfg.prompt=$('#aiPrompt').value.trim();
+  aiSaveConfig(cfg);
+  toast('AI 配置已保存');
+  $('#aiConfigHint').style.color='var(--green)';
+  $('#aiConfigHint').textContent='已保存。可到「报告导入」粘贴文本后点「AI 智能识别」使用。';
+};
+$('#aiClearBtn').onclick=()=>{if(!confirm('清除 AI 接口配置？'))return;aiClearConfig();aiFillForm();$('#aiConfigHint').textContent='配置已清除。';toast('已清除 AI 配置');};
+$('#aiTestBtn').onclick=aiTest;
+$('#aiApiKey').addEventListener('input',()=>{const h=$('#aiConfigHint');if(h)h.textContent='';});
 $('#gasRunBtn').onclick=gasAnalyze;
 $('#gasFillBtn').onclick=()=>{if(!patient()){toast('请先选择患者');return;}openGasFromLatest();};
 $('#gasExDka').onclick=()=>gasFillExample('dka');
