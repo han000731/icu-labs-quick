@@ -153,6 +153,26 @@ textarea{resize:vertical;min-height:150px;line-height:1.5}
 .history-note-input{min-height:38px!important}
 .history-row.note-row{grid-template-columns:minmax(170px,1fr) minmax(220px,2fr) auto auto}
 .history-row.note-row .history-change{display:none}
+/* 历史记录：只读精简模式 + 编辑切换 */
+.hist-bar{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;flex-wrap:wrap}
+.hist-bar .hist-count{font-size:12px;color:var(--muted);font-weight:600}
+.hist-bar .hist-acts{display:flex;gap:6px}
+.hist-bar button{min-height:36px;padding:0 14px;font-size:13px;font-weight:700;border-radius:8px;cursor:pointer}
+.hist-bar .hist-edit{color:var(--blue);border:1px solid #b9d9e5;background:#f3f9fc}
+.hist-bar .hist-save{color:#fff;border:0;background:linear-gradient(135deg,#1f8fbf,#36a9d6);box-shadow:0 2px 6px rgba(31,143,191,.28)}
+.hist-bar .hist-cancel{color:var(--muted);border:1px solid #dde5e9;background:#fff}
+.history-row.ro{grid-template-columns:minmax(96px,auto) minmax(70px,1fr) minmax(64px,auto);gap:10px;padding:8px 10px;background:#fbfdfe}
+.history-row.ro .ro-date{font-size:13px;font-weight:700;color:var(--text);white-space:nowrap}
+.history-row.ro .ro-date small{display:block;font-weight:400;font-size:11px;color:var(--muted)}
+.history-row.ro .ro-val{font-size:16px;font-weight:800;color:var(--text);white-space:nowrap}
+.history-row.ro .ro-val.abn{color:var(--red)}
+.history-row.ro .ro-val small{font-size:11px;font-weight:600;color:var(--muted);margin-left:3px}
+.history-row.ro .ro-txt{font-size:14px;font-weight:600;color:var(--text);word-break:break-all}
+.history-row.ro .history-change{font-weight:700}
+.history-row.ro.is-latest{border-color:#b9d9e5;background:#f3f9fc}
+.history-row.ed{grid-template-columns:minmax(170px,1.25fr) minmax(110px,.8fr) minmax(56px,auto) auto;border-color:#cfe3ec;background:#fcfeff}
+.history-row.ed.note-row{grid-template-columns:minmax(170px,1fr) minmax(220px,2fr) auto}
+.hist-edit-tip{margin:-2px 0 8px;padding:6px 8px;border-radius:6px;background:#fff8e8;border:1px solid #f0dcae;color:#8a6412;font-size:11px;line-height:1.5}
 .inline-entry{display:grid;grid-template-columns:minmax(180px,1.1fr) minmax(120px,.8fr) auto;gap:8px;align-items:end;margin-bottom:10px;padding:10px;border:1px solid #b9d9e5;border-radius:9px;background:#f1f8fb}
 .inline-entry label{display:grid;gap:4px;color:var(--muted);font-size:12px;font-weight:700}
 .inline-entry input{min-height:42px;background:#fff;font-size:16px}
@@ -607,6 +627,14 @@ textarea{resize:vertical;min-height:150px;line-height:1.5}
   .history-row .history-delete{grid-column:2}
   .history-row.note-row{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
   .history-row.note-row .history-value-wrap{grid-column:1/-1}
+  /* 只读精简行：窄屏保持单行三列，不拆行 */
+  .history-row.ro{grid-template-columns:minmax(84px,auto) minmax(60px,1fr) minmax(58px,auto)}
+  .history-row.ro .ro-date,.history-row.ro .ro-val,.history-row.ro .ro-txt,.history-row.ro .history-change{grid-column:auto}
+  .hist-bar button{flex:1;min-height:44px}
+  .hist-bar .hist-acts{flex:1}
+  .history-row.ed{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}
+  .history-row.ed .history-delete{grid-column:1/-1}
+  .history-row.ed.note-row{grid-template-columns:minmax(0,1fr)}
   .inline-entry{grid-template-columns:1fr 1fr}
   .inline-entry button{grid-column:1/-1;width:100%}
   .dict-form{grid-template-columns:1fr 1fr}
@@ -1085,9 +1113,10 @@ const fmtNum=v=>{const x=parseFloat(v);if(!isFinite(x))return v;if(Math.abs(x)>=
 const n=v=>{const x=parseFloat(v);return isFinite(x)?x:null};
 function toast(s){const t=$('#notice');t.textContent=s;t.style.opacity='1';clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.opacity='0',1800);}
 /* 版本与更新提示 */
-const APP_VERSION='2026.08.08-r10';
+const APP_VERSION='2026.08.09-r11';
 const READ_VERSION_KEY='wb_lab_read_version_v1';
 const UPDATE_LOG=[
+  {v:'2026.08.09-r11',date:'2026-08-09',title:'指标历史记录：只读精简 + 一键编辑',items:['点击任一指标（如白细胞）展开各日期历史，默认只读精简展示','只读态仅显示日期、数值、单位与升降趋势，超范围值标红、最新条高亮','点「编辑」切换为可编辑，可改日期与数值，改完点「保存」统一提交','点「取消」放弃本次修改，不写入数据','未改动的行不再被规范化覆盖（6.20 不会变成 6.2）','删除单条数值增加二次确认']},
   {v:'2026.08.08-r10',date:'2026-08-08',title:'报告导入页新增醒目「AI 智能识别」按钮',items:['识别按钮移到粘贴框上方，独立行动条，带图标不易错过','行动条实时显示接口状态（已连接模型名 / 未配置警示）','未配置接口时点击直达「我的 → AI 智能录入」配置页','手机端按钮全宽、高度 48px，符合触控标准','识别中按钮禁用防重复点击，结束自动复位']},
   {v:'2026.08.08-r9',date:'2026-08-08',title:'修复 AI 识别返回为空',items:['修复致命缺陷：请求未携带化验文本（提示词 ${text} 占位符从未被替换）','自定义提示词未写占位符时，自动把化验文本追加到末尾','测试连接改用真实样本，成功时显示识别出的项目数','区分「连接失败」与「已连通但模型未按格式返回」两类提示']},
   {v:'2026.08.08-r8',date:'2026-08-08',title:'识别增强：完整识别与按日期归档',items:['修复「名称 数值 单位」三段式识别，单位不再丢失','报告头支持带时间戳（如 血液(2026-08-08 08:30):）','肺泡-动脉氧分压差(A-aDO2)恢复为可识别指标','同日记录自动追加合并，不同日期自动创建新记录','科学计数法单位（如 10^9/L）不再被误拆','AI 配置支持思考模式开关（DeepSeek V4 适配，已实测连通）']},
@@ -2462,18 +2491,67 @@ function populateRowDetail(container,catId,itemId,showEntry=false){
     <label class="entry-value">${esc(entryName)}${detailInputHtml(it,'data-inline-value')}${unit?`<small>${esc(unit)}</small>`:''}</label>
     <button class="primary" data-inline-save>保存本项</button>
   </div>`:'';
+  /* 编辑态：默认只读精简，点「编辑」后才可改。状态挂在 expandedMetric.histEdit 上，renderAll 后仍保持 */
+  const histEdit=!!(expandedMetric&&expandedMetric.pid===p.id&&expandedMetric.catId===catId&&expandedMetric.itemId===itemId&&expandedMetric.histEdit);
+  const histBar=cnt=>`<div class="hist-bar"><span class="hist-count">历史记录 ${cnt} 条${cnt?(histEdit?' · 编辑模式':' · 只读'):''}</span><span class="hist-acts">${
+    cnt?(histEdit
+      ?`<button class="hist-save" data-hist-save-all>保存</button><button class="hist-cancel" data-hist-cancel>取消</button>`
+      :`<button class="hist-edit" data-hist-edit>编辑</button>`):''}</span></div>`;
+  const editTip=histEdit?'<div class="hist-edit-tip">编辑模式：可修改日期与数值，改完点上方「保存」生效；点「取消」放弃本次修改。日期属于整条查房记录，修改后同次录入的其他项目时间也会同步变化。</div>':'';
   if(isNote){
     const series=recs(p).filter(r=>r.values&&r.values[itemId]!==undefined&&r.values[itemId]!=='').map(r=>({id:r.id,t:r.time,txt:r.values[itemId]}));
-    const rows=series.map(s=>`<div class="history-row note-row" data-history-id="${esc(s.id)}"><input class="history-time" type="datetime-local" data-history-time value="${esc(String(s.t).slice(0,16))}"><div class="history-value-wrap">${detailInputHtml(it,'data-history-value',s.txt)}</div><span class="history-change"></span><button class="history-save" data-history-save="${esc(s.id)}">保存</button><button class="history-delete" data-history-delete="${esc(s.id)}">删除</button></div>`).join('');
-    container.innerHTML=entryHtml+`<div class="history-hint">日期属于整条查房记录，修改后同次录入的其他项目时间也会同步变化。</div><div class="history-list">${rows||'<div class="empty">无记录</div>'}</div>`;
+    const rows=series.map((s,i)=>histEdit
+      ?`<div class="history-row note-row ed" data-history-id="${esc(s.id)}"><input class="history-time" type="datetime-local" data-history-time value="${esc(String(s.t).slice(0,16))}"><div class="history-value-wrap">${detailInputHtml(it,'data-history-value',s.txt)}</div><button class="history-delete" data-history-delete="${esc(s.id)}">删除</button></div>`
+      :`<div class="history-row ro note-row${i===0?' is-latest':''}" data-history-id="${esc(s.id)}"><div class="ro-date">${esc(fmt(s.t).slice(0,10))}<small>${esc(String(s.t).slice(11,16))}</small></div><div class="ro-txt">${esc(formatFieldVal(it,s.txt))}</div><span class="history-change">${i===0?'最新':''}</span></div>`).join('');
+    container.innerHTML=entryHtml+histBar(series.length)+editTip+`<div class="history-list">${rows||'<div class="empty">无记录</div>'}</div>`;
   }else{
     const series=recs(p).filter(r=>r.values&&r.values[itemId]!==undefined&&r.values[itemId]!==''&&n(r.values[itemId])!==null).map(r=>({id:r.id,t:r.time,v:n(r.values[itemId])}));
     const newest=series[0],oldest=series[series.length-1];
     let trend='历史记录不足（需至少 2 次）';
     if(newest&&oldest&&series.length>=2){const diff=newest.v-oldest.v;const arrow=diff>0?'↑':diff<0?'↓':'→';trend=`${fmt(oldest.t).slice(5)} ${fmtNum(oldest.v)} → ${fmt(newest.t).slice(5)} ${fmtNum(newest.v)}　<b class="${diff>0?'trend-up':diff<0?'trend-down':'trend-flat'}">${arrow} ${diff>0?'+':''}${fmtNum(diff)}</b>`;}
-    const rows=series.map((s,i)=>{const prev=series[i+1];const diff=prev? s.v-prev.v:null;const change=diff===null?'—':`${diff>0?'↑':diff<0?'↓':'→'} ${diff>0?'+':''}${fmtNum(diff)}`;return `<div class="history-row" data-history-id="${esc(s.id)}"><input class="history-time" type="datetime-local" data-history-time value="${esc(String(s.t).slice(0,16))}" aria-label="记录时间"><div class="history-value-wrap"><input type="number" step="any" data-history-value value="${esc(s.v)}" aria-label="${esc(displayItemName(it)||itemId)}数值"><small>${esc(unit)}</small></div><span class="history-change ${diff!==null&&diff>0?'trend-up':diff!==null&&diff<0?'trend-down':'trend-flat'}">${change}</span><button class="history-save" data-history-save="${esc(s.id)}">保存</button><button class="history-delete" data-history-delete="${esc(s.id)}">删除</button></div>`;}).join('');
-    container.innerHTML=entryHtml+`<div class="trend-summary">文字趋势：${trend}</div><div class="history-hint">日期属于整条查房记录，修改后同次录入的其他项目时间也会同步变化。</div><div class="history-list">${rows||'<div class="empty">无记录</div>'}</div>`;
+    const rows=series.map((s,i)=>{
+      const prev=series[i+1];const diff=prev? s.v-prev.v:null;
+      const cls=diff!==null&&diff>0?'trend-up':diff!==null&&diff<0?'trend-down':'trend-flat';
+      const change=diff===null?'—':`${diff>0?'↑':diff<0?'↓':'→'} ${diff>0?'+':''}${fmtNum(diff)}`;
+      if(histEdit)return `<div class="history-row ed" data-history-id="${esc(s.id)}"><input class="history-time" type="datetime-local" data-history-time value="${esc(String(s.t).slice(0,16))}" aria-label="记录时间"><div class="history-value-wrap"><input type="number" step="any" data-history-value value="${esc(s.v)}" aria-label="${esc(displayItemName(it)||itemId)}数值"><small>${esc(unit)}</small></div><span class="history-change ${cls}">${change}</span><button class="history-delete" data-history-delete="${esc(s.id)}">删除</button></div>`;
+      const abn=abnormal(it,s.v);
+      return `<div class="history-row ro${i===0?' is-latest':''}" data-history-id="${esc(s.id)}"><div class="ro-date">${esc(fmt(s.t).slice(0,10))}<small>${esc(String(s.t).slice(11,16))}</small></div><div class="ro-val ${abn?'abn':''}">${fmtNum(s.v)}${unit?`<small>${esc(unit)}</small>`:''}</div><span class="history-change ${cls}">${change}</span></div>`;
+    }).join('');
+    container.innerHTML=entryHtml+`<div class="trend-summary">文字趋势：${trend}</div>`+histBar(series.length)+editTip+`<div class="history-list">${rows||'<div class="empty">无记录</div>'}</div>`;
   }
+  /* 只读 ⇄ 编辑 切换：只重绘本容器，不整页重渲染，避免丢失展开状态 */
+  const editBtn=container.querySelector('[data-hist-edit]');
+  if(editBtn)editBtn.onclick=e=>{e.stopPropagation();expandedMetric={pid:p.id,catId,itemId,histEdit:true};populateRowDetail(container,catId,itemId,false);};
+  const cancelBtn=container.querySelector('[data-hist-cancel]');
+  if(cancelBtn)cancelBtn.onclick=e=>{e.stopPropagation();expandedMetric={pid:p.id,catId,itemId,histEdit:false};populateRowDetail(container,catId,itemId,false);toast('已取消修改');};
+  /* 批量保存：一次性校验并提交所有行的日期与数值 */
+  const saveAllBtn=container.querySelector('[data-hist-save-all]');
+  if(saveAllBtn)saveAllBtn.onclick=e=>{
+    e.stopPropagation();const pp=patient();if(!pp)return;
+    const rows=[...container.querySelectorAll('.history-row.ed')],pend=[];
+    for(let i=0;i<rows.length;i++){
+      const row=rows[i],rec=pp.labs.find(r=>r.id===row.dataset.historyId);if(!rec)continue;
+      const time=row.querySelector('[data-history-time]').value;
+      const vEl=row.querySelector('[data-history-value]');const value=vEl?String(vEl.value).trim():'';
+      if(!time){toast(`第 ${i+1} 行：请填写日期时间`);row.querySelector('[data-history-time]').focus();return;}
+      if(value===''){toast(`第 ${i+1} 行：${isNote?'请填写内容':'请填写数值'}`);if(vEl)vEl.focus();return;}
+      if(!isNote&&n(value)===null){toast(`第 ${i+1} 行：数值格式不正确`);if(vEl)vEl.focus();return;}
+      pend.push({rec,time,value});
+    }
+    let changed=0;
+    pend.forEach(x=>{
+      const timeSame=String(x.rec.time||'').slice(0,16)===String(x.time).slice(0,16);
+      const cur=x.rec.values[itemId];
+      // 数值型按数值等价比较，避免 6.20 被输入框规范化成 6.2 而误判为「已修改」
+      const valSame=isNote?String(cur)===String(x.value):(n(cur)!==null&&n(x.value)!==null&&n(cur)===n(x.value));
+      if(timeSame&&valSame)return;   // 该行没动过，保持原始写法不覆盖
+      changed++;x.rec.time=x.time;x.rec.values[itemId]=x.value;
+    });
+    pp.labs.sort((a,b)=>new Date(b.time)-new Date(a.time));
+    expandedMetric={pid:pp.id,catId,itemId,histEdit:false};
+    save();renderAll();
+    toast(changed?`已保存 ${changed} 条修改`:'没有需要保存的改动');
+  };
   const inlineSave=container.querySelector('[data-inline-save]');
   if(inlineSave)inlineSave.onclick=e=>{
     e.stopPropagation();const pp=patient(),time=container.querySelector('[data-inline-time]').value,value=container.querySelector('[data-inline-value]').value.trim();
@@ -2482,15 +2560,11 @@ function populateRowDetail(container,catId,itemId,showEntry=false){
     if(!rec){rec={id:uid(),time:String(time).slice(0,16),values:{},source:'inline'};pp.labs.push(rec);}rec.values=rec.values||{};rec.values[itemId]=value;
     pp.labs.sort((a,b)=>new Date(b.time)-new Date(a.time));expandedMetric={pid:pp.id,catId,itemId,entry:false};save();renderAll();toast(`已保存${entryName}`);
   };
-  container.querySelectorAll('[data-history-save]').forEach(b=>b.onclick=e=>{
-    e.stopPropagation();const pp=patient(),rec=pp&&pp.labs.find(r=>r.id===b.dataset.historySave),row=b.closest('.history-row');if(!rec||!row)return;
-    const time=row.querySelector('[data-history-time]').value,value=row.querySelector('[data-history-value]').value.trim();
-    if(!time){toast('请填写日期时间');return;}if(value===''){toast('请填写数值');return;}if(!isNote&&n(value)===null){toast('数值格式不正确');return;}
-    rec.time=time;rec.values[itemId]=value;pp.labs.sort((a,b2)=>new Date(b2.time)-new Date(a.time));expandedMetric={pid:pp.id,catId,itemId};save();renderAll();toast('日期和数值已更新');
-  });
   container.querySelectorAll('[data-history-delete]').forEach(b=>b.onclick=e=>{
     e.stopPropagation();const pp=patient(),rec=pp&&pp.labs.find(r=>r.id===b.dataset.historyDelete);if(!rec||!rec.values)return;
-    delete rec.values[itemId];if(!Object.keys(rec.values).length)pp.labs=pp.labs.filter(r=>r.id!==rec.id);expandedMetric={pid:pp.id,catId,itemId};save();renderAll();toast('已删除该项数值');
+    if(!confirm('删除这条记录的本项数值？'))return;
+    delete rec.values[itemId];if(!Object.keys(rec.values).length)pp.labs=pp.labs.filter(r=>r.id!==rec.id);
+    expandedMetric={pid:pp.id,catId,itemId,histEdit:true};save();renderAll();toast('已删除该项数值');
   });
 }
 /* ===== 化验记录面板（可展开查看/编辑每一次录入的全部字段）===== */
