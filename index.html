@@ -439,6 +439,23 @@ textarea{resize:vertical;min-height:150px;line-height:1.5}
 .paste-meta .ai{background:linear-gradient(135deg,#534ab7,#7f77dd);border:0;color:#fff;border-radius:9px;min-height:40px;padding:0 14px;font-weight:700;font-size:14px;display:inline-flex;align-items:center;gap:6px;cursor:pointer}
 .paste-meta .ai:disabled{opacity:.55;cursor:wait}
 .paste-meta .ai svg{width:16px;height:16px}
+/* AI 识别行动条：置于粘贴框上方的显著入口 */
+.ai-bar{display:flex;align-items:center;gap:12px;justify-content:space-between;margin:0 0 10px;padding:10px 12px;border-radius:12px;background:linear-gradient(135deg,#f2f0ff,#eaf1fb);border:1px solid #ddd8f5}
+.ai-bar-info{display:flex;align-items:center;gap:9px;min-width:0}
+.ai-bar-info>svg{width:22px;height:22px;flex:none;color:#534ab7}
+.ai-bar-txt{min-width:0}
+.ai-bar-txt b{display:block;font-size:14px;color:#3b3480;line-height:1.3}
+.ai-bar-txt span{display:block;font-size:12px;color:var(--muted);line-height:1.4}
+.ai-bar-txt span.warn{color:#a86a00;font-weight:700}
+.ai-big{flex:none;background:linear-gradient(135deg,#534ab7,#7f77dd);border:0;color:#fff;border-radius:10px;min-height:44px;padding:0 18px;font-weight:800;font-size:15px;display:inline-flex;align-items:center;gap:7px;cursor:pointer;box-shadow:0 2px 8px rgba(83,74,183,.28)}
+.ai-big:hover{filter:brightness(1.07)}
+.ai-big:active{transform:translateY(1px)}
+.ai-big:disabled{opacity:.6;cursor:wait;box-shadow:none}
+.ai-big svg{width:18px;height:18px;flex:none}
+@media(max-width:600px){
+  .ai-bar{flex-direction:column;align-items:stretch;gap:10px}
+  .ai-big{width:100%;justify-content:center;min-height:48px}
+}
 .ai-status{margin:8px 0;padding:8px 12px;border-radius:8px;font-size:13px;background:#eaf3f7;border:1px solid var(--line);color:var(--blue2)}
 .ai-status.err{background:#fcebeb;border-color:#f7c1c1;color:#a32d2d}
 .ai-status.ok{background:#eaf3de;border-color:#c0dd97;color:#3b6d11}
@@ -870,12 +887,21 @@ textarea{resize:vertical;min-height:150px;line-height:1.5}
   <div class="modal">
     <div class="modal-head"><h2 id="pasteTitle"></h2><button class="close" data-close="pasteModal">← 返回</button></div>
     <div class="modal-body">
+      <div class="ai-bar" id="aiBar">
+        <div class="ai-bar-info">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 4.7L18.6 9.6l-4.7 1.9L12 16.2l-1.9-4.7L5.4 9.6l4.7-1.9L12 3z"/><path d="M19 15l.9 2.2L22 18l-2.1.8L19 21l-.9-2.2L16 18l2.1-.8L19 15z"/></svg>
+          <div class="ai-bar-txt"><b>AI 智能识别</b><span id="aiBarHint">粘贴报告后点右侧按钮，自动提取项目、数值与日期</span></div>
+        </div>
+        <button class="ai-big" id="aiParseBtn" type="button" title="使用已配置的 AI 接口识别化验文本">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.9 4.7L18.6 9.6l-4.7 1.9L12 16.2l-1.9-4.7L5.4 9.6l4.7-1.9L12 3z"/></svg>
+          <span class="lbl">AI 智能识别</span>
+        </button>
+      </div>
       <textarea class="paste-area" id="pasteText" placeholder="把化验报告整段粘贴到这里，或直接自由输入，例如：&#10;1.急诊肾功能+血液(2026-08-05):★丙氨酸氨基转移酶29.44U/L ，★肌酐（酶法）149.93μmol/L↑ ，…&#10;2.急诊血常规+血液(2026-08-05):★白细胞3.61*10^9/L ，★血小板计数25*10^9/L↓↓ ，…&#10;也可以只写一行：白细胞2.3，红细胞3.5，血红蛋白110，血小板80"></textarea>
       <div class="paste-meta">
         <select id="pastePatient"></select>
         <input type="date" id="pasteDate" title="自由粘贴时使用的日期（报告带日期则以其为准）">
         <button class="primary" id="parsePasteBtn"></button>
-        <button class="ai" id="aiParseBtn" title="使用已配置的 AI 接口识别化验文本">AI 智能识别</button>
         <button id="clearPasteBtn"></button>
       </div>
       <div id="aiStatus" class="ai-status" hidden></div>
@@ -1059,9 +1085,10 @@ const fmtNum=v=>{const x=parseFloat(v);if(!isFinite(x))return v;if(Math.abs(x)>=
 const n=v=>{const x=parseFloat(v);return isFinite(x)?x:null};
 function toast(s){const t=$('#notice');t.textContent=s;t.style.opacity='1';clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.opacity='0',1800);}
 /* 版本与更新提示 */
-const APP_VERSION='2026.08.08-r9';
+const APP_VERSION='2026.08.08-r10';
 const READ_VERSION_KEY='wb_lab_read_version_v1';
 const UPDATE_LOG=[
+  {v:'2026.08.08-r10',date:'2026-08-08',title:'报告导入页新增醒目「AI 智能识别」按钮',items:['识别按钮移到粘贴框上方，独立行动条，带图标不易错过','行动条实时显示接口状态（已连接模型名 / 未配置警示）','未配置接口时点击直达「我的 → AI 智能录入」配置页','手机端按钮全宽、高度 48px，符合触控标准','识别中按钮禁用防重复点击，结束自动复位']},
   {v:'2026.08.08-r9',date:'2026-08-08',title:'修复 AI 识别返回为空',items:['修复致命缺陷：请求未携带化验文本（提示词 ${text} 占位符从未被替换）','自定义提示词未写占位符时，自动把化验文本追加到末尾','测试连接改用真实样本，成功时显示识别出的项目数','区分「连接失败」与「已连通但模型未按格式返回」两类提示']},
   {v:'2026.08.08-r8',date:'2026-08-08',title:'识别增强：完整识别与按日期归档',items:['修复「名称 数值 单位」三段式识别，单位不再丢失','报告头支持带时间戳（如 血液(2026-08-08 08:30):）','肺泡-动脉氧分压差(A-aDO2)恢复为可识别指标','同日记录自动追加合并，不同日期自动创建新记录','科学计数法单位（如 10^9/L）不再被误拆','AI 配置支持思考模式开关（DeepSeek V4 适配，已实测连通）']},
   {v:'2026.08.08-r7',date:'2026-08-08',title:'AI 智能录入（可配置接口）',items:['支持配置 OpenAI 兼容接口（地址/密钥/模型/路径）','报告导入新增「AI 智能识别」，自动识别化验文本','AI 返回结果校验与异常处理，失败自动回退本地解析','识别提示词可自定义，接口测试连接一键验证']},
@@ -2891,9 +2918,11 @@ function openPaste(){
   renderPatientSelect();
   $('#pasteDate').value=todayStr();
   $('#pasteText').value='';
-  $('#pastePreview').innerHTML='<div class="pb-none">粘贴后点「解析报告」，系统会自动识别项目名、数值与异常箭头，并归入对应类别；陌生项目将自动学习为自定义项。</div>';
-  parsedResult=null;
+  $('#pastePreview').innerHTML='<div class="pb-none">粘贴后点上方「AI 智能识别」或下方「解析报告」，系统会自动识别项目名、数值与异常箭头，并归入对应类别；陌生项目将自动学习为自定义项。</div>';
+  parsedResult=null;aiParsedResult=null;
   $('#savePasteBtn').disabled=true;
+  const st=$('#aiStatus');if(st){st.hidden=true;st.className='ai-status';st.innerHTML='';}
+  refreshAiBar();
   showView('pasteModal');
 }
 function doParsePaste(){
@@ -3021,13 +3050,30 @@ function normalizeAiResult(obj){
 }
 /* AI 识别主入口：调用接口 → 结果合并到预览 */
 let aiParsedResult=null;
-async function doAiParse(){
-  const txt=$('#pasteText').value;
-  if(!txt.trim()){toast('请先粘贴报告');return}
+/* 按钮文案（保留内部 SVG 图标不被覆盖） */
+function aiBtnLabel(btn,txt){
+  const l=btn&&btn.querySelector('.lbl');
+  if(l)l.textContent=txt; else if(btn)btn.textContent=txt;
+}
+/* 刷新识别行动条状态：未配置接口时给出显著提示 */
+function refreshAiBar(){
+  const hint=$('#aiBarHint');if(!hint)return;
   const cfg=aiLoadConfig();
-  if(!cfg){toast('请先在「我的 → AI 智能录入」配置接口');return}
+  if(cfg){hint.className='';hint.textContent=`已连接 ${cfg.model||'AI 接口'} · 粘贴报告后点右侧按钮识别`;}
+  else{hint.className='warn';hint.textContent='尚未配置 AI 接口 · 点击右侧按钮前往配置';}
+}
+async function doAiParse(){
+  const cfg=aiLoadConfig();
+  if(!cfg){
+    toast('请先配置 AI 接口');
+    hideViews();
+    if(typeof openAiConfig==='function')openAiConfig(); else showView('aiConfigModal');
+    return;
+  }
+  const txt=$('#pasteText').value;
+  if(!txt.trim()){toast('请先粘贴报告');$('#pasteText').focus();return}
   const btn=$('#aiParseBtn'),st=$('#aiStatus');
-  btn.disabled=true;btn.textContent='AI 识别中…';
+  btn.disabled=true;aiBtnLabel(btn,'AI 识别中…');
   st.hidden=false;st.className='ai-status';st.innerHTML='正在调用 AI 接口识别化验文本…';
   try{
     const r=await aiCall(txt,cfg);
@@ -3045,7 +3091,7 @@ async function doAiParse(){
     const local=parsePaste(txt,$('#pasteDate').value||todayStr());
     if(!local.error){parsedResult=local;aiParsedResult=null;renderPastePreview(local);st.innerHTML+='<br>已回退为本地规则解析。';}
   }finally{
-    btn.disabled=false;btn.textContent='AI 智能识别';
+    btn.disabled=false;aiBtnLabel(btn,'AI 智能识别');
   }
 }
 /* 预览渲染（供 AI 与本地共用） */
@@ -3555,6 +3601,18 @@ function initMyMenu(){
     if(willOpen){panel.classList.add('open');el.classList.add('on');const a=el.querySelector('.mi-arrow');if(a)a.textContent='▾';}
   });
 }
+/* 从报告导入页直达 AI 接口配置（展开「我的 → AI 智能录入」并滚动定位） */
+function openAiConfig(){
+  showView('pmModal');
+  const item=$('#pmModal .menu-item[data-menu="ai"]'),panel=$('#pmModal .menu-panel[data-menu="ai"]');
+  if(!panel)return;
+  $$('#pmModal .menu-panel').forEach(p=>p.classList.remove('open'));
+  $$('#pmModal .menu-item').forEach(m=>{m.classList.remove('on');const a=m.querySelector('.mi-arrow');if(a)a.textContent='▸';});
+  panel.classList.add('open');
+  if(item){item.classList.add('on');const a=item.querySelector('.mi-arrow');if(a)a.textContent='▾';}
+  if(typeof aiFillForm==='function')aiFillForm();
+  setTimeout(()=>{try{(item||panel).scrollIntoView({behavior:'smooth',block:'start'})}catch(e){}},60);
+}
 /* 评分页：仅在首次进入或换了患者时重建，避免抹掉已填参数 */
 let scoreDirty=true,scorePid=null;
 function enterScorePage(){
@@ -3789,8 +3847,9 @@ $('#aiSaveBtn').onclick=()=>{
   toast('AI 配置已保存');
   $('#aiConfigHint').style.color='var(--green)';
   $('#aiConfigHint').textContent='已保存。可到「报告导入」粘贴文本后点「AI 智能识别」使用。';
+  refreshAiBar();
 };
-$('#aiClearBtn').onclick=()=>{if(!confirm('清除 AI 接口配置？'))return;aiClearConfig();aiFillForm();$('#aiConfigHint').textContent='配置已清除。';toast('已清除 AI 配置');};
+$('#aiClearBtn').onclick=()=>{if(!confirm('清除 AI 接口配置？'))return;aiClearConfig();aiFillForm();$('#aiConfigHint').textContent='配置已清除。';refreshAiBar();toast('已清除 AI 配置');};
 $('#aiTestBtn').onclick=aiTest;
 $('#aiApiKey').addEventListener('input',()=>{const h=$('#aiConfigHint');if(h)h.textContent='';});
 $('#gasRunBtn').onclick=gasAnalyze;
